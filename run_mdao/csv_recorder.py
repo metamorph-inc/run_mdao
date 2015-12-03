@@ -1,5 +1,6 @@
 import sys
 import csv
+from collections import OrderedDict
 
 import numpy
 
@@ -50,8 +51,8 @@ class MappingCsvRecorder(BaseRecorder):
         self._wrote_header = False
         self._parallel = False
 
-        self.params_map = params_map
-        self.unknowns_map = unknowns_map
+        self.params_map = OrderedDict(((k, v) for k, v in sorted(params_map.iteritems())))
+        self.unknowns_map = OrderedDict(((k, v) for k, v in sorted(unknowns_map.iteritems())))
 
         if out != sys.stdout:
             self.out = out
