@@ -122,7 +122,7 @@ class PredeterminedRunsDriver(Driver):
 
         # Do the runs
         for run in run_list:
-            debug("run: ", run)
+            # debug("run: ", run)
             for dv_name, dv_val in run.iteritems():
                 self.set_desvar(dv_name, dv_val)
 
@@ -220,6 +220,9 @@ class TestBenchComponent(Component):
             if source_is_not_driver and 'source' in param:
                 source_component = {c.name: c for c in root.components()}[param['source'][0]]
                 val = source_component._unknowns_dict[param['source'][-1]]['val']
+            elif 'source' in param:
+                if mdao_config['drivers'][param['source'][0]]['designVariables'][param['source'][-1]]["type"] == "enum":
+                    val = u''
 
             self.add_param(_get_param_name(param_name), val=val, pass_by_obj=pass_by_obj)
 
