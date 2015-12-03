@@ -369,7 +369,7 @@ def run(filename):
             component = mdao_config['components'][component_name]
             component_type = component.get('type', 'TestBenchComponent')
             if component_type == 'IndepVarComp':
-                vars = ((name, float(metric['value']), {'pass_by_obj': True}) for name, metric in component['unknowns'].iteritems())
+                vars = ((name, metric['value'], {'pass_by_obj': True}) for name, metric in component['unknowns'].iteritems())
                 root.add(component_name, IndepVarComp(vars))
             elif component_type == 'TestBenchComponent':
                 tb = TestBenchComponent(component_name, mdao_config, root)

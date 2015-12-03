@@ -5,6 +5,9 @@
             "unknowns": {
                 "Reynolds_Number": {
                     "value": 200000
+                },
+                "Test_String": {
+                    "value": "a string"
                 }
             }
         },
