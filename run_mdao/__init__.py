@@ -1,5 +1,6 @@
 from __future__ import print_function
 import sys
+import os
 import os.path
 import contextlib
 import json
@@ -7,7 +8,10 @@ import subprocess
 import collections
 import importlib
 import time
-
+import tempfile
+import socket
+import zipfile
+import StringIO
 import numpy
 import itertools
 
@@ -23,6 +27,10 @@ from openmdao.core.group import Group
 from openmdao.components.indep_var_comp import IndepVarComp
 from openmdao.api import ScipyOptimizer
 from openmdao.core.driver import Driver
+from openmdao.util.array_util import evenly_distrib_idxs
+
+from openmdao.util.record_util import create_local_meta, update_local_meta
+from openmdao.core.mpi_wrap import MPI, debug
 
 
 def CouchDBRecorder(*args, **kwargs):
@@ -31,7 +39,16 @@ def CouchDBRecorder(*args, **kwargs):
     return CouchDBRecorder(*args, **kwargs)
 
 
-from openmdao.util.record_util import create_local_meta, update_local_meta
+if MPI:
+    from openmdao.core.petsc_impl import PetscImpl as impl
+else:
+    from openmdao.api import BasicImpl as impl
+# This failsafe logic can be removed once 'parallel_doe' branch is merged
+try:
+    from openmdao.core.parallel_doe_group import ParallelDOEGroup
+except ImportError:
+    def ParallelDOEGroup(num_par_doe):
+        return Group()
 
 # cache the output of a TestBenchComponent if the computation exceeds this many seconds. Otherwise, save memory by throwing it out
 CACHE_THRESHOLD_SECONDS = 5
@@ -72,11 +89,27 @@ def _get_param_name(param_name):
 
 
 class PredeterminedRunsDriver(Driver):
+
     def __init__(self, num_samples=5, *args, **kwargs):
         if type(self) == PredeterminedRunsDriver:
             raise Exception('PredeterminedRunsDriver is an abstract class')
         super(PredeterminedRunsDriver, self).__init__(*args, **kwargs)
         self.num_samples = num_samples
+
+    def _setup(self, root):
+            super(PredeterminedRunsDriver, self)._setup(root)
+            if MPI and isinstance(root, ParallelDOEGroup):  # pragma: no cover
+                comm = root._full_comm
+                job_list = None
+                if comm.rank == 0:
+                    debug('Parallel DOE using %d threads' % (root._num_par_doe,))
+                    run_list = list(self._build_runlist())  # need to run the iterator
+                    run_sizes, run_offsets = evenly_distrib_idxs(root._num_par_doe, len(run_list))
+                    job_list = [run_list[o:o+s] for o, s in zip(run_offsets, run_sizes)]
+                self.run_list = comm.scatter(job_list, root=0)
+                debug('Number of DOE jobs: %s' % (len(self.run_list),))
+            else:
+                self.run_list = self._build_runlist()
 
     def run(self, problem):
         log = dict()
@@ -89,7 +122,7 @@ class PredeterminedRunsDriver(Driver):
 
         # Do the runs
         for run in run_list:
-            print("run: ", run)
+            debug("run: ", run)
             for dv_name, dv_val in run.iteritems():
                 self.set_desvar(dv_name, dv_val)
 
@@ -252,14 +285,62 @@ class TestBenchComponent(Component):
         raise Exception('unsupported')
 
 
+def par_clone_and_config(filename):
+    wdir = tempfile.mkdtemp(prefix='mdao-')
+    comm = MPI.COMM_WORLD
+    rank = comm.Get_rank()
+
+    # Distributing the config from root node to every worker
+    if rank == 0:
+        with open(filename, 'rb') as mdao_config_json:
+            mdao_config = json.loads(mdao_config_json.read())
+        # Extra info if SFTP/SCP is used to pull from root
+        root_ip = socket.gethostbyname(socket.gethostname())
+        root_dir = os.path.dirname(os.path.abspath(filename))
+        mdao_config['mpi'] = {'root_ip': root_ip, 'root_dir': root_dir}
+    else:
+        mdao_config = None
+    mdao_config = comm.bcast(mdao_config, root=0)
+
+    # Distributing all artifacts (via MPI, for now)
+    if rank == 0:
+        zbuff = StringIO.StringIO()
+        with zipfile.ZipFile(zbuff, 'w') as zf:
+            # this might be too fancy, we can zip everyhting in 'root_dir'
+            for component in mdao_config['components'].itervalues():
+                try:
+                    component_dir = component['details']['directory']
+                except KeyError:
+                    continue
+                for root, dirs, files in os.walk(component_dir):
+                    for file in files:
+                        zf.write(os.path.join(root, file))
+    else:
+        zbuff = None
+    zbuff = comm.bcast(zbuff, root=0)
+
+    # Extracting all artifacts and cd to the work dir
+    os.chdir(wdir)
+    with zipfile.ZipFile(zbuff, 'r') as zf:
+        zf.extractall()
+
+    return mdao_config
+
+
 def run(filename):
-    with open(filename, 'rb') as mdao_config_json:
-        mdao_config = json.loads(mdao_config_json.read())
+    if MPI:
+        mdao_config = par_clone_and_config(filename)
+    else:
+        with open(filename, 'rb') as mdao_config_json:
+            mdao_config = json.loads(mdao_config_json.read())
     # TODO: can we support more than one driver
     driver = next(iter(mdao_config['drivers'].values()))
 
-    top = Problem()
-    root = top.root = Group()
+    top = Problem(impl=impl)
+    if MPI:
+        root = top.root = ParallelDOEGroup(impl.world_comm().size)
+    else:
+        root = top.root = Group()
     recorder = None
     driver_params = {}
     eval(compile(driver['details']['Code'], '<driver Code>', 'exec'), globals(), driver_params)
@@ -402,6 +483,8 @@ def run(filename):
                 top.driver.add_objective(str('.'.join(objective['source'])))
 
         top.setup()
+        # from openmdao.devtools.debug import dump_meta
+        # dump_meta(top.root)
         top.run()
     finally:
         for recorder in recorders:
