@@ -5,7 +5,6 @@ from collections import OrderedDict
 import numpy
 
 from openmdao.recorders.base_recorder import BaseRecorder
-from openmdao.util.record_util import format_iteration_coordinate
 
 
 class CsvRecorder(BaseRecorder):
