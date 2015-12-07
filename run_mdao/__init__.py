@@ -11,12 +11,10 @@ import socket
 import zipfile
 import StringIO
 import numpy
-import itertools
-
-import six.moves
 
 from run_mdao.csv_recorder import MappingCsvRecorder
 from run_mdao.enum_mapper import EnumMapper
+from run_mdao.drivers import FullFactorialDriver, UniformDriver, LatinHypercubeDriver, OptimizedLatinHypercubeDriver
 
 # from openmdao.api import IndepVarComp, Component, Problem, Group
 from openmdao.core.problem import Problem
@@ -24,11 +22,8 @@ from openmdao.core.component import Component
 from openmdao.core.group import Group
 from openmdao.components.indep_var_comp import IndepVarComp
 from openmdao.api import ScipyOptimizer
-from openmdao.core.driver import Driver
-from openmdao.util.array_util import evenly_distrib_idxs
 
-from openmdao.util.record_util import create_local_meta, update_local_meta
-from openmdao.core.mpi_wrap import MPI, debug
+from openmdao.core.mpi_wrap import MPI
 
 
 def CouchDBRecorder(*args, **kwargs):
@@ -84,122 +79,6 @@ def _memoize_solve(fn):
 def _get_param_name(param_name):
     """OpenMDAO won't let us have a parameter and output of the same name..."""
     return 'param_{}'.format(param_name)
-
-
-class PredeterminedRunsDriver(Driver):
-
-    def __init__(self, num_samples=5, *args, **kwargs):
-        if type(self) == PredeterminedRunsDriver:
-            raise Exception('PredeterminedRunsDriver is an abstract class')
-        super(PredeterminedRunsDriver, self).__init__(*args, **kwargs)
-        self.num_samples = num_samples
-
-    def _setup(self, root):
-            super(PredeterminedRunsDriver, self)._setup(root)
-            if MPI and isinstance(root, ParallelDOEGroup):  # pragma: no cover
-                comm = root._full_comm
-                job_list = None
-                if comm.rank == 0:
-                    debug('Parallel DOE using %d threads' % (root._num_par_doe,))
-                    run_list = list(self._build_runlist())  # need to run the iterator
-                    run_sizes, run_offsets = evenly_distrib_idxs(root._num_par_doe, len(run_list))
-                    job_list = [run_list[o:o+s] for o, s in zip(run_offsets, run_sizes)]
-                self.run_list = comm.scatter(job_list, root=0)
-                debug('Number of DOE jobs: %s' % (len(self.run_list),))
-            else:
-                self.run_list = self._build_runlist()
-
-    def run(self, problem):
-        log = dict()
-
-        log["get_desvar_metadata"] = self.get_desvar_metadata()
-
-        # Let's iterate and run
-        run_list = self._build_runlist()
-        # log["runlist"] = list(run_list)
-
-        # Do the runs
-        for run in run_list:
-            # debug("run: ", run)
-            for dv_name, dv_val in run.iteritems():
-                self.set_desvar(dv_name, dv_val)
-
-            metadata = create_local_meta(None, 'Driver')
-            problem.root.solve_nonlinear(metadata=metadata)
-            self.recorders.record_iteration(problem.root, metadata)
-
-        # Store log
-        with open("log.log", "w") as lg:
-            json.dump(log, lg, indent=2)
-
-
-class FullFactorialDriver(PredeterminedRunsDriver):
-    def __init__(self, *args, **kwargs):
-        super(FullFactorialDriver, self).__init__(*args, **kwargs)
-
-    def _build_runlist(self):
-        # Set up Uniform distribution arrays
-        value_arrays = dict()
-        for name, value in self.get_desvar_metadata().iteritems():
-            if value.get('type', 'double') == 'double':
-                low = value['low']
-                high = value['high']
-                value_arrays[name] = numpy.linspace(low, high, num=self.num_samples).tolist()
-            elif value.get('type') == 'enum':
-                value_arrays[name] = list(value['items'])
-            elif value.get('type') == 'int':
-                value_arrays[name] = list(range(value['low'], value['high'] + 1))
-        # log["arrays"] = value_arrays
-
-        keys = list(value_arrays.keys())
-        for combination in itertools.product(*value_arrays.values()):
-            yield dict(six.moves.zip(keys, combination))
-
-
-class UniformDriver(PredeterminedRunsDriver):
-    def __init__(self, *args, **kwargs):
-        super(UniformDriver, self).__init__(*args, **kwargs)
-
-    def _build_runlist(self):
-        def sample_var(metadata):
-            if metadata.get('type', 'double') == 'double':
-                return numpy.random.uniform(metadata['low'], metadata['high'])
-            elif metadata.get('type') == 'enum':
-                return numpy.random.choice(metadata['items'])
-            elif metadata.get('type') == 'int':
-                return numpy.random.randint(metadata['low'], metadata['high'] + 1)
-
-        for i in six.moves.xrange(self.num_samples):
-            yield dict(((key, sample_var(metadata)) for key, metadata in self.get_desvar_metadata().iteritems()))
-
-
-class LatinHypercubeDriver(PredeterminedRunsDriver):
-    def __init__(self, *args, **kwargs):
-        super(LatinHypercubeDriver, self).__init__(*args, **kwargs)
-
-    def _build_runlist(self):
-        design_vars = self.get_desvar_metadata()
-        design_vars_names = list(design_vars)
-        buckets = dict()
-        for design_var_name in design_vars_names:
-            metadata = design_vars[design_var_name]
-            if metadata.get('type', 'double') == 'double':
-                bucket_walls = numpy.linspace(metadata['low'], metadata['high'], num=self.num_samples + 1)
-                buckets[design_var_name] = [numpy.random.uniform(low, high) for low, high in six.moves.zip(bucket_walls[0:-1], bucket_walls[1:])]
-            elif metadata.get('type') == 'enum':
-                # length is generated such that all items have an equal chance of appearing when num_samples % len(items) != 0
-                length = self.num_samples + (-self.num_samples % len(metadata['items']))
-                buckets[design_var_name] = list(itertools.islice(itertools.cycle(metadata['items']), length))
-            elif metadata.get('type') == 'int':
-                # FIXME: should do buckets instead
-                num_items = int(metadata['high'] - metadata['low'] + 1)
-                length = self.num_samples + (-self.num_samples % num_items)
-                buckets[design_var_name] = list(itertools.islice(itertools.cycle(range(int(metadata['low']), int(metadata['high'] + 1))), length))
-
-            numpy.random.shuffle(buckets[design_var_name])
-
-        for i in six.moves.xrange(self.num_samples):
-            yield dict(((key, values[i]) for key, values in buckets.iteritems()))
 
 
 class TestBenchComponent(Component):
@@ -356,8 +235,8 @@ def run(filename):
         drivers = {
             "Uniform": UniformDriver,
             "Full Factorial": FullFactorialDriver,
-            "Latin Hypercube": LatinHypercubeDriver,  # FIXME this is not in CyPhyML.xme
-            "Opt Latin Hypercube": LatinHypercubeDriver,  # FIXME workaround for no "Latin Hypercube" in CyPhyML.xme
+            "Latin Hypercube": LatinHypercubeDriver,
+            "Opt Latin Hypercube": OptimizedLatinHypercubeDriver,
         }
         driver_type = drivers.get(driver['details']['DOEType'])
         if driver_type is None:
