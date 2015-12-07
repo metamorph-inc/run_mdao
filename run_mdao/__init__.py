@@ -372,8 +372,13 @@ def run(filename):
         recorders = []
         design_var_map = {get_desvar_path(designVariable): designVariable for designVariable in driver['designVariables']}
         objective_map = {'{}.{}'.format(objective['source'][0], objective['source'][1]): objective_name for objective_name, objective in driver['objectives'].iteritems()}
+        constants_map = {}
+        for name, constant in (c for c in mdao_config['components'].iteritems() if c[1].get('type', 'TestBenchComponent') == 'IndepVarComp'):
+            constants_map.update({'{}.{}'.format(name, unknown): unknown for unknown in constant['unknowns']})
+
         unknowns_map = design_var_map
         unknowns_map.update(objective_map)
+        unknowns_map.update(constants_map)
         for recorder in mdao_config.get('recorders', [{'type': 'DriverCsvRecorder', 'filename': 'output.csv'}]):
             if recorder['type'] == 'DriverCsvRecorder':
                 recorder = MappingCsvRecorder({}, unknowns_map, open(recorder['filename'], 'wb'))
