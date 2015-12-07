@@ -2,10 +2,8 @@ from __future__ import print_function
 import sys
 import os
 import os.path
-import contextlib
 import json
 import subprocess
-import collections
 import importlib
 import time
 import tempfile
@@ -221,7 +219,7 @@ class TestBenchComponent(Component):
                 source_component = {c.name: c for c in root.components()}[param['source'][0]]
                 val = source_component._unknowns_dict[param['source'][-1]]['val']
             elif 'source' in param:
-                if mdao_config['drivers'][param['source'][0]]['designVariables'][param['source'][-1]]["type"] == "enum":
+                if mdao_config['drivers'][param['source'][0]]['designVariables'][param['source'][-1]].get('type') == "enum":
                     val = u''
 
             self.add_param(_get_param_name(param_name), val=val, pass_by_obj=pass_by_obj)
