@@ -78,8 +78,10 @@ class RestartRecorder(object):
         self.output_lock.acquire()
         try:
             self.progress_by_rank[rank] = self.progress_by_rank[rank] + 1
-            with open(self.output_filename, 'wb') as output:
+            tmp_output = self.output_filename + '.tmp'
+            with open(tmp_output, 'wb') as output:
                 json.dump(self.progress_by_rank, output)
+            os.rename(tmp_output, self.output_filename)
         finally:
             self.output_lock.release()
 
