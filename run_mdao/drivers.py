@@ -88,7 +88,7 @@ class FullFactorialDriver(PredeterminedRunsDriver):
             elif value.get('type') == 'enum':
                 value_arrays[name] = list(value['items'])
             elif value.get('type') == 'int':
-                value_arrays[name] = list(range(value['low'], value['high'] + 1))
+                value_arrays[name] = list(range(int(value['low']), int(value['high']) + 1))
         # log["arrays"] = value_arrays
 
         keys = list(value_arrays.keys())
@@ -199,7 +199,10 @@ class OptimizedLatinHypercubeDriver(PredeterminedRunsDriver):
                         # FIXME do we need to round max up sometimes
                         return numpy.random.randint(low + (num_items * bucket // self.num_samples), low + (num_items * (bucket + 1) // self.num_samples))
                     else:
-                        return enums[design_var][bucket % num_items]
+                        if bucket < self.num_samples - (self.num_samples % num_items):
+                            return low + bucket % num_items
+                        else:
+                            return enums[design_var][bucket % num_items]
 
             yield {design_var: get_random_in_bucket(design_var, rand_lhc[i, j]) for j, design_var in enumerate(design_vars_names)}
 
