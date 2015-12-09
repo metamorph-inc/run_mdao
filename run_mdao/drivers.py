@@ -2,7 +2,6 @@ from __future__ import print_function
 import json
 import numpy
 import itertools
-import math
 
 from openmdao.core.group import Group
 from openmdao.core.driver import Driver
@@ -33,19 +32,19 @@ class PredeterminedRunsDriver(Driver):
         self.num_samples = num_samples
 
     def _setup(self, root):
-            super(PredeterminedRunsDriver, self)._setup(root)
-            if MPI and isinstance(root, ParallelDOEGroup):  # pragma: no cover
-                comm = root._full_comm
-                job_list = None
-                if comm.rank == 0:
-                    debug('Parallel DOE using %d threads' % (root._num_par_doe,))
-                    run_list = list(self._build_runlist())  # need to run the iterator
-                    run_sizes, run_offsets = evenly_distrib_idxs(root._num_par_doe, len(run_list))
-                    job_list = [run_list[o:o+s] for o, s in zip(run_offsets, run_sizes)]
-                self.run_list = comm.scatter(job_list, root=0)
-                debug('Number of DOE jobs: %s' % (len(self.run_list),))
-            else:
-                self.run_list = self._build_runlist()
+        super(PredeterminedRunsDriver, self)._setup(root)
+        if MPI and isinstance(root, ParallelDOEGroup):  # pragma: no cover
+            comm = root._full_comm
+            job_list = None
+            if comm.rank == 0:
+                debug('Parallel DOE using %d threads' % (root._num_par_doe,))
+                run_list = list(self._build_runlist())  # need to run the iterator
+                run_sizes, run_offsets = evenly_distrib_idxs(root._num_par_doe, len(run_list))
+                job_list = [run_list[o:o+s] for o, s in zip(run_offsets, run_sizes)]
+            self.run_list = comm.scatter(job_list, root=0)
+            debug('Number of DOE jobs: %s' % (len(self.run_list),))
+        else:
+            self.run_list = self._build_runlist()
 
     def run(self, problem):
         log = dict()
@@ -58,17 +57,20 @@ class PredeterminedRunsDriver(Driver):
 
         # Do the runs
         for run in run_list:
-            # debug("run: ", run)
-            for dv_name, dv_val in run.iteritems():
-                self.set_desvar(dv_name, dv_val)
-
-            metadata = create_local_meta(None, 'Driver')
-            problem.root.solve_nonlinear(metadata=metadata)
-            self.recorders.record_iteration(problem.root, metadata)
+            self.run_one(problem, run)
 
         # Store log
         with open("log.log", "w") as lg:
             json.dump(log, lg, indent=2)
+
+    def run_one(self, problem, run):
+        # debug("run: ", run)
+        for dv_name, dv_val in run.iteritems():
+            self.set_desvar(dv_name, dv_val)
+
+        metadata = create_local_meta(None, 'Driver')
+        problem.root.solve_nonlinear(metadata=metadata)
+        self.recorders.record_iteration(problem.root, metadata)
 
 
 class FullFactorialDriver(PredeterminedRunsDriver):
@@ -165,7 +167,7 @@ class OptimizedLatinHypercubeDriver(PredeterminedRunsDriver):
         # Generate an LHC of the proper size
         rand_lhc = self._get_lhc()
 
-        enums = dict()
+        enums = {}
         for design_var_name, metadata in iteritems(design_vars):
             if metadata.get('type', 'double') == 'enum':
                 # length is generated such that all items have an equal chance of appearing when num_samples % len(items) != 0

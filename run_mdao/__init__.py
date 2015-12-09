@@ -14,7 +14,7 @@ import numpy
 
 from run_mdao.csv_recorder import MappingCsvRecorder
 from run_mdao.enum_mapper import EnumMapper
-from run_mdao.drivers import FullFactorialDriver, UniformDriver, LatinHypercubeDriver, OptimizedLatinHypercubeDriver
+from run_mdao.drivers import FullFactorialDriver, UniformDriver, LatinHypercubeDriver, OptimizedLatinHypercubeDriver, PredeterminedRunsDriver
 
 # from openmdao.api import IndepVarComp, Component, Problem, Group
 from openmdao.core.problem import Problem
@@ -207,7 +207,18 @@ def par_clone_and_config(filename):
     return mdao_config
 
 
-def run(filename):
+def run_one(filename, input):
+    class OneInputDriver(PredeterminedRunsDriver):
+        def __init__(self, *args, **kwargs):
+            super(PredeterminedRunsDriver, self).__init__(*args, **kwargs)
+
+        def _build_runlist(self):
+            return [input]
+
+    run(filename, override_driver=OneInputDriver())
+
+
+def run(filename, override_driver=None):
     if MPI:
         mdao_config = par_clone_and_config(filename)
     else:
@@ -241,7 +252,10 @@ def run(filename):
         driver_type = drivers.get(driver['details']['DOEType'])
         if driver_type is None:
             raise Exception('DOEType "{}" is unsupported'.format(driver['details']['DOEType']))
-        top.driver = driver_type(**driver_params)
+        if override_driver is None:
+            top.driver = driver_type(**driver_params)
+        else:
+            top.driver = override_driver
 
         # top.driver.options[''] = ...
     else:
