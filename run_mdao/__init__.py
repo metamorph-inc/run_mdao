@@ -88,6 +88,8 @@ class TestBenchComponent(Component):
         self.mdao_config = mdao_config
         self.directory = mdao_config['components'][name]['details']['directory']
         self.original_testbench_manifest = self._read_testbench_manifest()
+        for metric in self.original_testbench_manifest.get('Metrics', ()):
+            metric['Value'] = None
 
         self.fd_options['force_fd'] = True
 
