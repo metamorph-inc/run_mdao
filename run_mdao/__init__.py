@@ -32,6 +32,10 @@ def CouchDBRecorder(*args, **kwargs):
     return CouchDBRecorder(*args, **kwargs)
 
 
+def FmuWrapper(*args, **kwargs):
+    from fmu_wrapper import fmu_wrapper
+    return fmu_wrapper.FmuWrapper(*args, **kwargs)
+
 if MPI:
     from openmdao.core.petsc_impl import PetscImpl as impl
 else:
@@ -76,8 +80,10 @@ def _memoize_solve(fn):
     return solve_nonlinear
 
 
-def _get_param_name(param_name):
+def _get_param_name(param_name, component_type):
     """OpenMDAO won't let us have a parameter and output of the same name..."""
+    if component_type == 'FMU':  # FIXME
+        return param_name
     return 'param_{}'.format(param_name)
 
 
@@ -360,6 +366,8 @@ def run(filename, override_driver=None):
                 root.add(component_name, tb)
             elif component_type == 'EnumMap':
                 root.add(component_name, EnumMapper(component['details']['config'], param_name=_get_param_name('input')))
+            elif component_type == 'FMU':
+                root.add(component_name, FmuWrapper(component['details']['fmu']))
             else:
                 if '.' in component_type:
                     component_instance = importlib.import_module('.'.join(component_type.split('.')[:-1]))[component_type.split('.')[-1]](**component['details'])
@@ -373,9 +381,9 @@ def run(filename, override_driver=None):
                     source = parameter['source']
                     if source[0] in mdao_config['drivers']:
                         # print('driver{}.{}'.format(source[1], source[1]))
-                        root.connect(get_desvar_path(source[1]), '{}.{}'.format(component_name, _get_param_name(parameter_name)))
+                        root.connect(get_desvar_path(source[1]), '{}.{}'.format(component_name, _get_param_name(parameter_name, component.get('type'))))
                     else:
-                        root.connect('{}.{}'.format(source[0], source[1]), '{}.{}'.format(component_name, _get_param_name(parameter_name)))
+                        root.connect('{}.{}'.format(source[0], source[1]), '{}.{}'.format(component_name, _get_param_name(parameter_name, component.get('type'))))
                 else:
                     pass  # TODO warn or fail?
 
