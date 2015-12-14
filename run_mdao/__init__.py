@@ -11,6 +11,7 @@ import socket
 import zipfile
 import StringIO
 import numpy
+import six
 
 from run_mdao.csv_recorder import MappingCsvRecorder
 from run_mdao.enum_mapper import EnumMapper
@@ -357,7 +358,13 @@ def run(filename, override_driver=None):
             component = mdao_config['components'][component_name]
             component_type = component.get('type', 'TestBenchComponent')
             if component_type == 'IndepVarComp':
-                vars = ((name, metric['value'], {'pass_by_obj': True}) for name, metric in component['unknowns'].iteritems())
+                def get_unknown_val(unknown):
+                    if unknown.get('type') is None:
+                        return unknown['value']
+                    return {'double': float,
+                            'int': int,
+                            'string': six.text_type}[unknown['type']](unknown['value'])
+                vars = ((name, get_unknown_val(unknown), {'pass_by_obj': True}) for name, unknown in component['unknowns'].iteritems())
                 root.add(component_name, IndepVarComp(vars))
             elif component_type == 'TestBenchComponent':
                 tb = TestBenchComponent(component_name, mdao_config, root)
