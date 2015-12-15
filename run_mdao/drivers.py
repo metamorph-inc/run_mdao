@@ -84,10 +84,14 @@ class FullFactorialDriver(PredeterminedRunsDriver):
             if value.get('type', 'double') == 'double':
                 low = value['low']
                 high = value['high']
-                value_arrays[name] = numpy.linspace(low, high, num=self.num_samples).tolist()
+                if low == high:
+                    value_arrays[name] = [low]
+                else:
+                    value_arrays[name] = numpy.linspace(low, high, num=self.num_samples).tolist()
             elif value.get('type') == 'enum':
                 value_arrays[name] = list(value['items'])
             elif value.get('type') == 'int':
+                # TODO limit len to num_samples?
                 value_arrays[name] = list(range(int(value['low']), int(value['high']) + 1))
         # log["arrays"] = value_arrays
 
