@@ -81,7 +81,7 @@ def _memoize_solve(fn):
     return solve_nonlinear
 
 
-def _get_param_name(param_name, component_type):
+def _get_param_name(param_name, component_type=None):
     """OpenMDAO won't let us have a parameter and output of the same name..."""
     if component_type == 'FMU':  # FIXME
         return param_name
