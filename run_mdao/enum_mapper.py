@@ -25,7 +25,7 @@ class EnumMapper(Component):
                 # Check for key consistency
                 # TODO: Check for type consistency
                 same = first_map_counter == Counter(val.keys())
-                if same == False:
+                if same is False:
                     raise
 
         # Use the first config entry to set up the defaults
@@ -47,12 +47,12 @@ class EnumMapper(Component):
 
 # USAGE EXAMPLE
 
-#config = dict()
-#config["Ia"] = { "AverageWindSpeed": 10.0, "ExtremeGust": 70.0 }
-#config["Ib"] = { "AverageWindSpeed": 10.0, "ExtremeGust": 70.0 }
-#config["IIa"] = { "AverageWindSpeed": 8.5, "ExtremeGust": 59.5 }
-#config["IIb"] = { "AverageWindSpeed": 8.5, "ExtremeGust": 59.5 }
-#config["IIIa"] = { "AverageWindSpeed": 7.5, "ExtremeGust": 52.5 }
-#config["IIIb"] = { "AverageWindSpeed": 7.5, "ExtremeGust": 52.5 }
-#config["IV"] = { "AverageWindSpeed": 6.0, "ExtremeGust": 42.0 }
-#root.add('em', EnumMapper(config))
+# config = dict()
+# config["Ia"] = { "AverageWindSpeed": 10.0, "ExtremeGust": 70.0 }
+# config["Ib"] = { "AverageWindSpeed": 10.0, "ExtremeGust": 70.0 }
+# config["IIa"] = { "AverageWindSpeed": 8.5, "ExtremeGust": 59.5 }
+# config["IIb"] = { "AverageWindSpeed": 8.5, "ExtremeGust": 59.5 }
+# config["IIIa"] = { "AverageWindSpeed": 7.5, "ExtremeGust": 52.5 }
+# config["IIIb"] = { "AverageWindSpeed": 7.5, "ExtremeGust": 52.5 }
+# config["IV"] = { "AverageWindSpeed": 6.0, "ExtremeGust": 42.0 }
+# root.add('em', EnumMapper(config))
