@@ -115,7 +115,7 @@ class FullFactorialDriver(PredeterminedRunsDriver):
                 value_arrays[name] = list(value['items'])
             elif value.get('type') == 'int':
                 # TODO limit len to num_samples?
-                value_arrays[name] = list(range(int(value['low']), int(value['high']) + 1))
+                value_arrays[name] = list(range(int(value['lower']), int(value['upper']) + 1))
         # log["arrays"] = value_arrays
 
         keys = list(value_arrays.keys())
@@ -131,11 +131,11 @@ class UniformDriver(PredeterminedRunsDriver):
     def _build_runlist(self):
         def sample_var(metadata):
             if metadata.get('type', 'double') == 'double':
-                return numpy.random.uniform(metadata['low'], metadata['high'])
+                return numpy.random.uniform(metadata['lower'], metadata['upper'])
             elif metadata.get('type') == 'enum':
                 return numpy.random.choice(metadata['items'])
             elif metadata.get('type') == 'int':
-                return numpy.random.randint(metadata['low'], metadata['high'] + 1)
+                return numpy.random.randint(metadata['lower'], metadata['upper'] + 1)
 
         for i in moves.xrange(self.num_samples):
             yield ((key, sample_var(metadata)) for key, metadata in self.get_desvar_metadata().iteritems())
@@ -153,7 +153,7 @@ class LatinHypercubeDriver(PredeterminedRunsDriver):
         for design_var_name in design_vars_names:
             metadata = design_vars[design_var_name]
             if metadata.get('type', 'double') == 'double':
-                bucket_walls = numpy.linspace(metadata['low'], metadata['high'], num=self.num_samples + 1)
+                bucket_walls = numpy.linspace(metadata['lower'], metadata['upper'], num=self.num_samples + 1)
                 buckets[design_var_name] = [numpy.random.uniform(low, high) for low, high in moves.zip(bucket_walls[0:-1], bucket_walls[1:])]
             elif metadata.get('type') == 'enum':
                 # length is generated such that all items have an equal chance of appearing when num_samples % len(items) != 0
@@ -161,9 +161,9 @@ class LatinHypercubeDriver(PredeterminedRunsDriver):
                 buckets[design_var_name] = list(itertools.islice(itertools.cycle(metadata['items']), length))
             elif metadata.get('type') == 'int':
                 # FIXME: should do buckets instead
-                num_items = int(metadata['high'] - metadata['low'] + 1)
+                num_items = int(metadata['upper'] - metadata['lower'] + 1)
                 length = self.num_samples + (-self.num_samples % num_items)
-                buckets[design_var_name] = list(itertools.islice(itertools.cycle(range(int(metadata['low']), int(metadata['high'] + 1))), length))
+                buckets[design_var_name] = list(itertools.islice(itertools.cycle(range(int(metadata['lower']), int(metadata['upper'] + 1))), length))
 
             numpy.random.shuffle(buckets[design_var_name])
 
@@ -175,8 +175,8 @@ class OptimizedLatinHypercubeDriver(PredeterminedRunsDriver):
     """Design-of-experiments Driver implementing the Morris-Mitchell method for an Optimized Latin Hypercube.
     """
 
-    def __init__(self, num_samples, seed=None, population=20, generations=2, norm_method=1):
-        super(OptimizedLatinHypercubeDriver, self).__init__()
+    def __init__(self, num_samples, seed=None, population=20, generations=2, norm_method=1, *args, **kwargs):
+        super(OptimizedLatinHypercubeDriver, self).__init__(*args, **kwargs)
         self.qs = [1, 2, 5, 10, 20, 50, 100]  # List of qs to try for Phi_q optimization
         self.num_samples = num_samples
         self.seed = seed
@@ -205,7 +205,7 @@ class OptimizedLatinHypercubeDriver(PredeterminedRunsDriver):
                 numpy.random.shuffle(values)
                 enums[design_var_name] = values
             elif metadata.get('type', 'double') == 'int':
-                low, high = int(metadata['low']), int(metadata['high'])
+                low, high = int(metadata['lower']), int(metadata['upper'])
                 values = list(moves.xrange(low, high + 1))
                 numpy.random.shuffle(values)
                 enums[design_var_name] = values
@@ -217,12 +217,12 @@ class OptimizedLatinHypercubeDriver(PredeterminedRunsDriver):
                 if metadata.get('type') == 'enum':
                     return enums[design_var][bucket]
                 elif metadata.get('type', 'double') == 'double':
-                    low, high = metadata['low'], metadata['high']
+                    low, high = metadata['lower'], metadata['upper']
                     bucket_size = (high - low) / self.num_samples
                     return numpy.random.uniform(low + bucket_size * bucket, low + bucket_size * (bucket + 1))
                 elif metadata.get('type') == 'int':
-                    low, high = int(metadata['low']), int(metadata['high'])
-                    num_items = int(metadata['high'] - metadata['low'] + 1)
+                    low, high = int(metadata['lower']), int(metadata['upper'])
+                    num_items = int(metadata['upper'] - metadata['lower'] + 1)
 
                     if self.num_samples <= num_items:
                         # FIXME do we need to round max up sometimes
