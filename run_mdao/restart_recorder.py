@@ -2,6 +2,7 @@ import threading
 import json
 import os.path
 import csv
+import shutil
 
 from openmdao.util.array_util import evenly_distrib_idxs
 
@@ -16,10 +17,14 @@ class RestartRecorder(object):
     DOE_DONE_FLAG = 2416
 
     @classmethod
+    def is_restartable(cls, original_dir):
+        return os.path.isfile(os.path.join(original_dir, RestartRecorder.RESTART_PROGRESS_FILENAME)) and \
+                os.path.isfile(os.path.join(original_dir, RestartRecorder.RESTART_RUNLIST_FILENAME))
+
+    @classmethod
     def deserialize_runlist(cls, original_dir):
         # FIXME check mdao_config.json mtime and against these
-        if os.path.isfile(os.path.join(original_dir, RestartRecorder.RESTART_PROGRESS_FILENAME)) and \
-                os.path.isfile(os.path.join(original_dir, RestartRecorder.RESTART_RUNLIST_FILENAME)):
+        if cls.is_restartable(original_dir):
             with open(os.path.join(original_dir, RestartRecorder.RESTART_PROGRESS_FILENAME)) as restart_progress_file:
                 restart_progress = json.load(restart_progress_file)
             runlist = []
@@ -33,7 +38,7 @@ class RestartRecorder(object):
                     while already_done_ranges[1][0] <= i:
                         already_done_ranges = already_done_ranges[1:]
                     if not already_done_ranges[0][0] <= i < already_done_ranges[0][1]:
-                        runlist.append({field: run[j] for j, field in enumerate(header)})
+                        runlist.append([(field, run[j]) for j, field in enumerate(header)])
             return runlist
 
     @classmethod
@@ -41,10 +46,12 @@ class RestartRecorder(object):
         with open(os.path.join(original_dir, RestartRecorder.RESTART_RUNLIST_FILENAME), 'wb') as restart_runlist:
             restart_runlist.write(str(len(runlist)) + '\n')
             writer = csv.writer(restart_runlist)
-            header = list(runlist[0].keys())
+            header = list(p[0] for p in runlist[0])
             writer.writerow(header)
             for run in runlist:
-                writer.writerow([run[field] for field in header])
+                writer.writerow([p[1] for p in run])
+        with open(os.path.join(original_dir, RestartRecorder.RESTART_PROGRESS_FILENAME), 'wb') as restart_progress_file:
+            restart_progress_file.write('{}')
 
     def __init__(self, original_dir, comm):
         super(RestartRecorder, self).__init__()
@@ -81,7 +88,7 @@ class RestartRecorder(object):
             tmp_output = self.output_filename + '.tmp'
             with open(tmp_output, 'wb') as output:
                 json.dump(self.progress_by_rank, output)
-            os.rename(tmp_output, self.output_filename)
+            shutil.move(tmp_output, self.output_filename)
         finally:
             self.output_lock.release()
 
@@ -104,3 +111,6 @@ class RestartRecorder(object):
                 os.unlink(os.path.join(self.original_dir, RestartRecorder.RESTART_RUNLIST_FILENAME))
             else:
                 self.comm.send('Done', dest=0, tag=RestartRecorder.DOE_DONE_FLAG)
+        else:
+            os.unlink(self.output_filename)
+            os.unlink(os.path.join(self.original_dir, RestartRecorder.RESTART_RUNLIST_FILENAME))

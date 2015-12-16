@@ -16,6 +16,7 @@ import six
 from run_mdao.csv_recorder import MappingCsvRecorder
 from run_mdao.enum_mapper import EnumMapper
 from run_mdao.drivers import FullFactorialDriver, UniformDriver, LatinHypercubeDriver, OptimizedLatinHypercubeDriver, PredeterminedRunsDriver
+from run_mdao.restart_recorder import RestartRecorder
 
 # from openmdao.api import IndepVarComp, Component, Problem, Group
 from openmdao.core.problem import Problem
@@ -219,6 +220,7 @@ def run_one(filename, input):
 
 
 def run(filename, override_driver=None):
+    original_dir = os.path.dirname(os.path.abspath(filename))
     if MPI:
         mdao_config = par_clone_and_config(filename)
     else:
@@ -230,7 +232,7 @@ def run(filename, override_driver=None):
     top = Problem(impl=impl)
     root = top.root = Group()
     recorder = None
-    driver_params = {}
+    driver_params = {'original_dir': original_dir}
     eval(compile(driver['details']['Code'], '<driver Code>', 'exec'), globals(), driver_params)
 
     def get_desvar_path(designVariable):
@@ -271,7 +273,16 @@ def run(filename, override_driver=None):
         unknowns_map.update(constants_map)
         for recorder in mdao_config.get('recorders', [{'type': 'DriverCsvRecorder', 'filename': 'output.csv'}]):
             if recorder['type'] == 'DriverCsvRecorder':
-                recorder = MappingCsvRecorder({}, unknowns_map, open(recorder['filename'], 'wb'))
+                mode = 'wb'
+                if RestartRecorder.is_restartable(original_dir):
+                    try:
+                        if os.path.getmtime(recorder['filename']) > os.path.getmtime(filename):
+                            mode = 'ab'
+                    except OSError:
+                        pass
+                recorder = MappingCsvRecorder({}, unknowns_map, open(recorder['filename'], mode))
+                if mode == 'ab':
+                    recorder._wrote_header = True
             elif recorder['type'] == 'CouchDBRecorder':
                 recorder = CouchDBRecorder(recorder.get('url', 'http://localhost:5984/'), recorder['run_id'])
                 recorder.options['record_params'] = True

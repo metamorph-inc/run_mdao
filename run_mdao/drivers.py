@@ -18,14 +18,21 @@ from six import moves, itervalues, iteritems
 
 class PredeterminedRunsDriver(openmdao.api.PredeterminedRunsDriver):
 
-    def __init__(self, num_samples=5, num_par_doe=None, *args, **kwargs):
+    def __init__(self, original_dir, num_samples=5, *args, **kwargs):
         if type(self) == PredeterminedRunsDriver:
             raise Exception('PredeterminedRunsDriver is an abstract class')
         if MPI:
             comm = MPI.COMM_WORLD
-            num_par_doe = num_par_doe or comm.Get_size()
-        super(PredeterminedRunsDriver, self).__init__(*args, num_par_doe=num_par_doe, **kwargs)
+            kwargs.setdefault('num_par_doe', comm.Get_size())
+        else:
+            kwargs.setdefault('num_par_doe', 1)
+        super(PredeterminedRunsDriver, self).__init__(*args, **kwargs)
         self.supports['gradients'] = False
+        self.original_dir = original_dir
+
+    def _setup_communicators(self, comm):
+        super(PredeterminedRunsDriver, self)._setup_communicators(comm)
+        self.restart = RestartRecorder(self.original_dir, comm)
 
     def run(self, problem):
         """Build a runlist and execute the Problem for each set of generated
@@ -36,11 +43,13 @@ class PredeterminedRunsDriver(openmdao.api.PredeterminedRunsDriver):
         if MPI and self._num_par_doe > 1:
             runlist = self._distrib_build_runlist()
         else:
-            runlist = self._build_runlist()
+            runlist = self._deserialize_or_create_runlist()
 
         # For each runlist entry, run the system and record the results
         for run in runlist:
             self.run_one(problem, run)
+
+        self.restart.close()
 
     def run_one(self, problem, run):
         for dv_name, dv_val in run:
@@ -52,6 +61,7 @@ class PredeterminedRunsDriver(openmdao.api.PredeterminedRunsDriver):
         problem.root.solve_nonlinear(metadata=metadata)
         self.recorders.record_iteration(problem.root, metadata)
         self.iter_count += 1
+        self.restart.record_iteration()
 
     def _distrib_build_runlist(self):
         """
@@ -64,7 +74,7 @@ class PredeterminedRunsDriver(openmdao.api.PredeterminedRunsDriver):
         job_list = None
         if comm.rank == 0:
             debug('Parallel DOE using %d procs' % self._num_par_doe)
-            run_list = [list(case) for case in self._build_runlist()]  # need to run iterator
+            run_list = [list(case) for case in self._deserialize_or_create_runlist()]  # need to run iterator
 
             run_sizes, run_offsets = evenly_distrib_idxs(self._num_par_doe,
                                                          len(run_list))
@@ -76,6 +86,13 @@ class PredeterminedRunsDriver(openmdao.api.PredeterminedRunsDriver):
 
         for case in run_list:
             yield case
+
+    def _deserialize_or_create_runlist(self):
+        runlist = RestartRecorder.deserialize_runlist(self.original_dir)
+        if not runlist:
+            runlist = [list(run) for run in self._build_runlist()]
+        RestartRecorder.serialize_runlist(self.original_dir, runlist)
+        return runlist
 
 
 class FullFactorialDriver(PredeterminedRunsDriver):
