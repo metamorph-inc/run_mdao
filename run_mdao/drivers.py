@@ -1,89 +1,95 @@
 from __future__ import print_function
-import json
 import numpy
 import itertools
 
-from openmdao.core.group import Group
-from openmdao.core.driver import Driver
-from openmdao.util.array_util import evenly_distrib_idxs
+from run_mdao.restart_recorder import RestartRecorder
 
-from openmdao.util.record_util import create_local_meta
+from openmdao.util.array_util import evenly_distrib_idxs
+from openmdao.util.record_util import create_local_meta, update_local_meta
+
 from openmdao.core.mpi_wrap import MPI, debug
+import openmdao.api
 
 import random
 from random import shuffle, randint
 import numpy as np
 from six import moves, itervalues, iteritems
 
-# This failsafe logic can be removed once 'parallel_doe' branch is merged
-try:
-    from openmdao.core.parallel_doe_group import ParallelDOEGroup
-except ImportError:
-    def ParallelDOEGroup(num_par_doe):
-        return Group()
 
+class PredeterminedRunsDriver(openmdao.api.PredeterminedRunsDriver):
 
-class PredeterminedRunsDriver(Driver):
-
-    def __init__(self, num_samples=5, *args, **kwargs):
+    def __init__(self, num_samples=5, num_par_doe=None, *args, **kwargs):
         if type(self) == PredeterminedRunsDriver:
             raise Exception('PredeterminedRunsDriver is an abstract class')
-        super(PredeterminedRunsDriver, self).__init__(*args, **kwargs)
-        self.num_samples = num_samples
-
-    def _setup(self, root):
-        super(PredeterminedRunsDriver, self)._setup(root)
-        if MPI and isinstance(root, ParallelDOEGroup):  # pragma: no cover
-            comm = root._full_comm
-            job_list = None
-            if comm.rank == 0:
-                debug('Parallel DOE using %d threads' % (root._num_par_doe,))
-                run_list = list(self._build_runlist())  # need to run the iterator
-                run_sizes, run_offsets = evenly_distrib_idxs(root._num_par_doe, len(run_list))
-                job_list = [run_list[o:o+s] for o, s in zip(run_offsets, run_sizes)]
-            self.run_list = comm.scatter(job_list, root=0)
-            debug('Number of DOE jobs: %s' % (len(self.run_list),))
-        else:
-            self.run_list = self._build_runlist()
+        if MPI:
+            comm = MPI.COMM_WORLD
+            num_par_doe = num_par_doe or comm.Get_size()
+        super(PredeterminedRunsDriver, self).__init__(*args, num_par_doe=num_par_doe, **kwargs)
+        self.supports['gradients'] = False
 
     def run(self, problem):
-        log = dict()
+        """Build a runlist and execute the Problem for each set of generated
+        parameters.
+        """
+        self.iter_count = 0
 
-        log["get_desvar_metadata"] = self.get_desvar_metadata()
+        if MPI and self._num_par_doe > 1:
+            runlist = self._distrib_build_runlist()
+        else:
+            runlist = self._build_runlist()
 
-        # Let's iterate and run
-        run_list = self._build_runlist()
-        # log["runlist"] = list(run_list)
-
-        # Do the runs
-        for run in run_list:
+        # For each runlist entry, run the system and record the results
+        for run in runlist:
             self.run_one(problem, run)
 
-        # Store log
-        with open("log.log", "w") as lg:
-            json.dump(log, lg, indent=2)
-
     def run_one(self, problem, run):
-        # debug("run: ", run)
-        for dv_name, dv_val in run.iteritems():
+        for dv_name, dv_val in run:
             self.set_desvar(dv_name, dv_val)
 
         metadata = create_local_meta(None, 'Driver')
+
+        update_local_meta(metadata, (self.iter_count,))
         problem.root.solve_nonlinear(metadata=metadata)
         self.recorders.record_iteration(problem.root, metadata)
+        self.iter_count += 1
+
+    def _distrib_build_runlist(self):
+        """
+        Returns an iterator over only those cases meant to execute
+        in the current rank as part of a parallel DOE. A latin hypercube,
+        unlike some other DOE generators, is created in one rank and then
+        the appropriate cases are scattered to the appropriate ranks.
+        """
+        comm = self._full_comm
+        job_list = None
+        if comm.rank == 0:
+            debug('Parallel DOE using %d procs' % self._num_par_doe)
+            run_list = [list(case) for case in self._build_runlist()]  # need to run iterator
+
+            run_sizes, run_offsets = evenly_distrib_idxs(self._num_par_doe,
+                                                         len(run_list))
+            job_list = [run_list[o:o+s] for o, s in zip(run_offsets,
+                                                        run_sizes)]
+
+        run_list = comm.scatter(job_list, root=0)
+        debug('Number of DOE jobs: %s' % len(run_list))
+
+        for case in run_list:
+            yield case
 
 
 class FullFactorialDriver(PredeterminedRunsDriver):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, num_samples=1, *args, **kwargs):
         super(FullFactorialDriver, self).__init__(*args, **kwargs)
+        self.num_samples = num_samples
 
     def _build_runlist(self):
         # Set up Uniform distribution arrays
         value_arrays = dict()
         for name, value in self.get_desvar_metadata().iteritems():
             if value.get('type', 'double') == 'double':
-                low = value['low']
-                high = value['high']
+                low = value['lower']
+                high = value['upper']
                 if low == high:
                     value_arrays[name] = [low]
                 else:
@@ -97,12 +103,13 @@ class FullFactorialDriver(PredeterminedRunsDriver):
 
         keys = list(value_arrays.keys())
         for combination in itertools.product(*value_arrays.values()):
-            yield dict(moves.zip(keys, combination))
+            yield moves.zip(keys, combination)
 
 
 class UniformDriver(PredeterminedRunsDriver):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, num_samples=1, *args, **kwargs):
         super(UniformDriver, self).__init__(*args, **kwargs)
+        self.num_samples = num_samples
 
     def _build_runlist(self):
         def sample_var(metadata):
@@ -114,12 +121,13 @@ class UniformDriver(PredeterminedRunsDriver):
                 return numpy.random.randint(metadata['low'], metadata['high'] + 1)
 
         for i in moves.xrange(self.num_samples):
-            yield dict(((key, sample_var(metadata)) for key, metadata in self.get_desvar_metadata().iteritems()))
+            yield ((key, sample_var(metadata)) for key, metadata in self.get_desvar_metadata().iteritems())
 
 
 class LatinHypercubeDriver(PredeterminedRunsDriver):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, num_samples=1, *args, **kwargs):
         super(LatinHypercubeDriver, self).__init__(*args, **kwargs)
+        self.num_samples = num_samples
 
     def _build_runlist(self):
         design_vars = self.get_desvar_metadata()
@@ -143,7 +151,7 @@ class LatinHypercubeDriver(PredeterminedRunsDriver):
             numpy.random.shuffle(buckets[design_var_name])
 
         for i in moves.xrange(self.num_samples):
-            yield dict(((key, values[i]) for key, values in buckets.iteritems()))
+            yield ((key, values[i]) for key, values in buckets.iteritems())
 
 
 class OptimizedLatinHypercubeDriver(PredeterminedRunsDriver):
@@ -208,7 +216,7 @@ class OptimizedLatinHypercubeDriver(PredeterminedRunsDriver):
                         else:
                             return enums[design_var][bucket % num_items]
 
-            yield {design_var: get_random_in_bucket(design_var, rand_lhc[i, j]) for j, design_var in enumerate(design_vars_names)}
+            yield ((design_var, get_random_in_bucket(design_var, rand_lhc[i, j])) for j, design_var in enumerate(design_vars_names))
 
     def _get_lhc(self):
         """Generate an Optimized Latin Hypercube

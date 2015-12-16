@@ -41,12 +41,6 @@ if MPI:
     from openmdao.core.petsc_impl import PetscImpl as impl
 else:
     from openmdao.api import BasicImpl as impl
-# This failsafe logic can be removed once 'parallel_doe' branch is merged
-try:
-    from openmdao.core.parallel_doe_group import ParallelDOEGroup
-except ImportError:
-    def ParallelDOEGroup(num_par_doe):
-        return Group()
 
 # cache the output of a TestBenchComponent if the computation exceeds this many seconds. Otherwise, save memory by throwing it out
 CACHE_THRESHOLD_SECONDS = 5
@@ -57,16 +51,11 @@ def _memoize_solve(fn):
     memo = {}
 
     def solve_nonlinear(tb_params, unknowns, resids):
-        def unwrap_param(param):
-            if param.get('pass_by_obj', False):
-                return unwrap_val(param['val'].val)
-            return unwrap_val(param['val'])
-
         def unwrap_val(val):
             if isinstance(val, numpy.ndarray):
                 return array_hashable(val)
             return val
-        hashable = tuple((unwrap_param(param) for param in tb_params.values()))
+        hashable = tuple((unwrap_val(param['val']) for param in tb_params.values()))
         memoized_unknowns = memo.get(hashable, None)
         if memoized_unknowns:
             # print('cache hit')
@@ -76,7 +65,8 @@ def _memoize_solve(fn):
         start = time.time()
         fn(tb_params, unknowns, resids=resids)
         if time.time() - start >= CACHE_THRESHOLD_SECONDS:
-            memo[hashable] = {key: (value['val'].val if value.get('pass_by_obj', False) else value['val']) for key, value in unknowns.iteritems()}
+            # memo[hashable] = {key: (value['val'].val if value.get('pass_by_obj', False) else value['val']) for key, value in unknowns.iteritems()}
+            memo[hashable] = {key: (value['val']) for key, value in unknowns.iteritems()}
 
     return solve_nonlinear
 
@@ -105,10 +95,11 @@ class TestBenchComponent(Component):
             val = 0.0
             if source_is_not_driver and 'source' in param:
                 source_component = {c.name: c for c in root.components()}[param['source'][0]]
-                val = source_component._unknowns_dict[param['source'][-1]]['val']
+                val = source_component._init_unknowns_dict[param['source'][-1]]['val']
             elif 'source' in param:
                 if mdao_config['drivers'][param['source'][0]]['designVariables'][param['source'][-1]].get('type') == "enum":
                     val = u''
+                    pass_by_obj = True
 
             self.add_param(_get_param_name(param_name), val=val, pass_by_obj=pass_by_obj)
 
@@ -129,14 +120,14 @@ class TestBenchComponent(Component):
         return subprocess.call([sys.executable, '-m', 'testbenchexecutor', 'testbench_manifest.json'], cwd=self.directory)
 
     def solve_nonlinear(self, params, unknowns, resids):
-        # TODO null out metrics and check they are set after execution
-        for param_name, param_value in params.iteritems():
+        # FIXME: without dict(), this returns wrong values. why?
+        for param_name, val in dict(params).iteritems():
             param_name = param_name[len(_get_param_name('')):]
             for manifest_param in self.original_testbench_manifest['Parameters']:
                 if manifest_param['Name'] == param_name:
-                    val = param_value['val']
-                    if param_value.get('pass_by_obj', True):
-                        val = val.val
+                    # val = param_value['val']
+                    # if param_value.get('pass_by_obj', True):
+                    #     val = val.val
                     if isinstance(val, numpy.ndarray):
                         # manifest_param['Value'] = list((numpy.asscalar(v) for v in param_value['val']))
                         if len(val) == 1:
@@ -237,10 +228,7 @@ def run(filename, override_driver=None):
     driver = next(iter(mdao_config['drivers'].values()))
 
     top = Problem(impl=impl)
-    if MPI:
-        root = top.root = ParallelDOEGroup(impl.world_comm().size)
-    else:
-        root = top.root = Group()
+    root = top.root = Group()
     recorder = None
     driver_params = {}
     eval(compile(driver['details']['Code'], '<driver Code>', 'exec'), globals(), driver_params)
@@ -310,7 +298,7 @@ def run(filename, override_driver=None):
         root.add(get_desvar_path('').split('.')[0], IndepVarComp(driver_vars))
         for var_name, var in driver['designVariables'].iteritems():
             if var.get('type', 'double') == 'double':
-                top.driver.add_desvar(get_desvar_path(var_name), low=var.get('RangeMin'), high=var.get('RangeMax'))
+                top.driver.add_desvar(get_desvar_path(var_name), lower=var.get('RangeMin'), upper=var.get('RangeMax'))
             elif var['type'] == 'enum':
                 driver_vars.append((var_name, u'', {"pass_by_obj": True}))
                 formatted_name = get_desvar_path(var_name)
@@ -320,7 +308,7 @@ def run(filename, override_driver=None):
             elif var['type'] == 'int':
                 driver_vars.append((var_name, 0.0))
                 formatted_name = get_desvar_path(var_name)
-                top.driver.add_desvar(formatted_name, low=var.get('RangeMin'), high=var.get('RangeMax'))
+                top.driver.add_desvar(formatted_name, lower=var.get('RangeMin'), upper=var.get('RangeMax'))
                 top.driver._desvars[formatted_name]['type'] = var['type']
             else:
                 raise ValueError('Unimplemented designVariable type "{}"'.format(var['type']))
