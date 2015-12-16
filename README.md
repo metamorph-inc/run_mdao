@@ -14,16 +14,15 @@ https://bitbucket.org/metamorphsoftwareinc/openmdao-couchdb-recorder master
 
 Use the same file paths on every machine. Optional: put a Python virtualenv and PETSc on NFS.
 
-1. You need to have MPICH installed:
+1. Prerequisites:
 
     ```
-apt-get install -y libmpich-dev mpich2 libmpich2-dev mpich2python
+apt-get install -y libmpich-dev mpich2 libmpich2-dev mpich2python python-dev build-essential libblas-dev liblapack-dev moreutils wget
     ```
 
 1. Also need PETSc:
 
     ```
-apt-get install -y build-essential libblas-dev liblapack-dev moreutils wget
 wget http://ftp.mcs.anl.gov/pub/petsc/release-snapshots/petsc-3.6.2.tar.gz
 tar xzvf petsc-3.6.2.tar.gz
 cd petsc-3.6.2
