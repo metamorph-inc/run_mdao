@@ -26,7 +26,7 @@ import shutil
 
 # TASK_TIMEOUT_S = 5 * 60
 TASK_TIMEOUT_S = float('inf')
-redis_host = '192.168.1.205'
+redis_host = os.environ.get('RUN_MDAO_REDIS_HOST', '192.168.1.205')
 
 redis_conn = redis.StrictRedis(host=redis_host, port=6379, db=0)
 app = Celery('tasks', backend='redis://{}/0'.format(redis_host), broker='redis://{}'.format(redis_host))
@@ -75,6 +75,10 @@ if __name__ == '__main__':
     def _run_one(self, problem, run):
         task = run_mdao.celery_tasks.run_one.delay(zipkey, run)
         task.get(timeout=TASK_TIMEOUT_S)
+
+        self.iter_count += 1
+        if self.use_restart:
+            self.restart.record_iteration()
 
     run_mdao.drivers.PredeterminedRunsDriver.run_one = _run_one
     run_mdao.run(input_filename)
