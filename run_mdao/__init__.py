@@ -209,11 +209,14 @@ def par_clone_and_config(filename):
 
 
 def run_one(filename, input):
+    original_dir = os.path.dirname(os.path.abspath(filename))
+
     class OneInputDriver(PredeterminedRunsDriver):
         def __init__(self, *args, **kwargs):
-            super(PredeterminedRunsDriver, self).__init__(*args, **kwargs)
+            super(OneInputDriver, self).__init__(original_dir=original_dir, num_samples=1, *args, **kwargs)
+            self.use_restart = False
 
-        def _build_runlist(self):
+        def _deserialize_or_create_runlist(self):
             return [input]
 
     run(filename, override_driver=OneInputDriver())

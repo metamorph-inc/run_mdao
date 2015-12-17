@@ -29,10 +29,12 @@ class PredeterminedRunsDriver(openmdao.api.PredeterminedRunsDriver):
         super(PredeterminedRunsDriver, self).__init__(*args, **kwargs)
         self.supports['gradients'] = False
         self.original_dir = original_dir
+        self.use_restart = True
 
     def _setup_communicators(self, comm):
         super(PredeterminedRunsDriver, self)._setup_communicators(comm)
-        self.restart = RestartRecorder(self.original_dir, comm)
+        if self.use_restart:
+            self.restart = RestartRecorder(self.original_dir, comm)
 
     def run(self, problem):
         """Build a runlist and execute the Problem for each set of generated
@@ -49,7 +51,8 @@ class PredeterminedRunsDriver(openmdao.api.PredeterminedRunsDriver):
         for run in runlist:
             self.run_one(problem, run)
 
-        self.restart.close()
+        if self.use_restart:
+            self.restart.close()
 
     def run_one(self, problem, run):
         for dv_name, dv_val in run:
@@ -61,7 +64,8 @@ class PredeterminedRunsDriver(openmdao.api.PredeterminedRunsDriver):
         problem.root.solve_nonlinear(metadata=metadata)
         self.recorders.record_iteration(problem.root, metadata)
         self.iter_count += 1
-        self.restart.record_iteration()
+        if self.use_restart:
+            self.restart.record_iteration()
 
     def _distrib_build_runlist(self):
         """
@@ -88,10 +92,13 @@ class PredeterminedRunsDriver(openmdao.api.PredeterminedRunsDriver):
             yield case
 
     def _deserialize_or_create_runlist(self):
-        runlist = RestartRecorder.deserialize_runlist(self.original_dir)
+        runlist = None
+        if self.use_restart:
+            runlist = RestartRecorder.deserialize_runlist(self.original_dir)
         if not runlist:
             runlist = [list(run) for run in self._build_runlist()]
-        RestartRecorder.serialize_runlist(self.original_dir, runlist)
+        if self.use_restart:
+            RestartRecorder.serialize_runlist(self.original_dir, runlist)
         return runlist
 
 

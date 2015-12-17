@@ -6,8 +6,19 @@ import os
 import os.path
 import shutil
 import subprocess
+import contextlib
 
 _this_dir = os.path.dirname(os.path.abspath(__file__))
+
+
+@contextlib.contextmanager
+def run_regression(output_filename):
+    os.chdir(_this_dir)
+    yield
+    shutil.copyfile('output.csv', output_filename)
+    changed = subprocess.check_output('git diff --name-only'.split() + [output_filename])
+    if len(changed) > 0:
+        raise Exception(changed)
 
 
 def main():
@@ -15,17 +26,16 @@ def main():
     tb_jsons = [(tb_json_name, open(tb_json_name, 'rb').read()) for tb_json_name in tb_json_names]
     try:
         for input_filename in glob.glob(_this_dir + '/mdao_config*json'):
-            os.chdir(_this_dir)
-            run_mdao.run(input_filename)
             output_filename = input_filename + '.output.csv'
-            shutil.copyfile('output.csv', output_filename)
-            changed = subprocess.check_output('git diff --name-only'.split() + [output_filename])
-            if len(changed) > 0:
-                raise Exception(changed)
+            with run_regression(output_filename):
+                    run_mdao.run(input_filename)
     finally:
         for tb_json_name, contents in tb_jsons:
             with open(tb_json_name, 'wb') as tb_json:
                 tb_json.write(contents)
+
+    with run_regression(os.path.join(_this_dir, 'single_run.csv')):
+        run_mdao.run_one('mdao_config_constant.json', (('designVariable.Naca_Code', 4040), ))
 
 if __name__ == '__main__':
     main()
