@@ -52,6 +52,9 @@ def _memoize_solve(fn):
     memo = {}
 
     def solve_nonlinear(tb_params, unknowns, resids):
+        # FIXME: without dict(), this returns wrong values. why?
+        tb_params = dict(tb_params)
+
         def unwrap_val(val):
             if isinstance(val, numpy.ndarray):
                 return array_hashable(val)
@@ -370,7 +373,8 @@ def run(filename, override_driver=None):
                 root.add(component_name, IndepVarComp(vars))
             elif component_type == 'TestBenchComponent':
                 tb = TestBenchComponent(component_name, mdao_config, root)
-                tb.solve_nonlinear = _memoize_solve(tb.solve_nonlinear)
+                # FIXME verify this works properly and re-enable
+                # tb.solve_nonlinear = _memoize_solve(tb.solve_nonlinear)
 
                 root.add(component_name, tb)
             elif component_type == 'EnumMap':
