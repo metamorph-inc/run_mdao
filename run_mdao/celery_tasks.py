@@ -38,7 +38,7 @@ app.conf.update(
 _zip_cache = {}
 
 
-@app.task(ignore_result=False, bind=True, max_retries=3, acks_late=True)
+@app.task(ignore_result=False, bind=True, max_retries=3, acks_late=True, track_started=True)
 def run_one(self, zipkey, *args):
     if len(_zip_cache) > 10:
         _zip_cache.clear()
