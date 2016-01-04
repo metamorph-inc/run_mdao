@@ -31,11 +31,15 @@ redis_host = os.environ.get('RUN_MDAO_REDIS_HOST', '192.168.1.205')
 redis_conn = redis.StrictRedis(host=redis_host, port=6379, db=0)
 app = Celery('tasks', backend='redis://{}/0'.format(redis_host), broker='redis://{}'.format(redis_host))
 
+app.conf.update(
+    CELERYD_PREFETCH_MULTIPLIER=1
+)
+
 _zip_cache = {}
 
 
-@app.task(ignore_result=False)
-def run_one(zipkey, *args):
+@app.task(ignore_result=False, bind=True, max_retries=3, acks_late=True)
+def run_one(self, zipkey, *args):
     if len(_zip_cache) > 10:
         _zip_cache.clear()
     wdir = tempfile.mkdtemp(prefix='mdao-')
@@ -46,7 +50,10 @@ def run_one(zipkey, *args):
         _zip_cache[zipkey] = input_zip = redis_conn.get(zipkey)
     with zipfile.ZipFile(StringIO.StringIO(input_zip), 'r') as zf:
         zf.extractall()
-    run_mdao.run_one('mdao_config.json', *args)
+    try:
+        run_mdao.run_one('mdao_config.json', *args)
+    except Exception as exc:
+        self.retry(exc=exc)
     os.chdir('/')
     shutil.rmtree(wdir)
 
