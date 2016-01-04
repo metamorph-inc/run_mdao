@@ -1,7 +1,9 @@
 r"""
 Distributes a DOE to Celery, one run at a time.
 
-celery -A run_mdao.celery_tasks worker --loglevel=info --pool=solo
+celery -A run_mdao.celery_tasks worker --loglevel=info --pool=gevent -c 1
+
+n.b.: run_mdao depends on the current working directory, so do not run without -c 1
 
 python celery_tasks.py mdao_config.json
 
@@ -23,6 +25,17 @@ import tempfile
 import zipfile
 import hashlib
 import shutil
+import traceback
+
+# if running the worker with gevent, we need to patch subprocess or the inspect and control commands will time out
+# celery worker runs monkey.patch_all, but it does not patch subprocess
+try:
+    import socket
+    from gevent import monkey
+    if socket.socket.__module__ == 'gevent.socket':
+        monkey.patch_subprocess()
+except ImportError:
+    pass
 
 # TASK_TIMEOUT_S = 5 * 60
 TASK_TIMEOUT_S = float('inf')
@@ -32,30 +45,43 @@ redis_conn = redis.StrictRedis(host=redis_host, port=6379, db=0)
 app = Celery('tasks', backend='redis://{}/0'.format(redis_host), broker='redis://{}'.format(redis_host))
 
 app.conf.update(
-    CELERYD_PREFETCH_MULTIPLIER=1
+    CELERYD_PREFETCH_MULTIPLIER=1,
+    CELERY_ACCEPT_CONTENT=['json', 'msgpack', 'yaml'],
+    CELERY_TASK_SERIALIZER='json'
 )
 
 _zip_cache = {}
 
+# celery worker: convert WindowsError to something non-Windows Pythons can deserialize
+try:
+    WindowsError = __builtins__.WindowsError
+except AttributeError:
+    class WindowsError(OSError):
+        pass
+
 
 @app.task(ignore_result=False, bind=True, max_retries=3, acks_late=True, track_started=True)
 def run_one(self, zipkey, *args):
-    if len(_zip_cache) > 10:
-        _zip_cache.clear()
-    wdir = tempfile.mkdtemp(prefix='mdao-')
-    os.chdir(wdir)
-    print 'Executing {} in {}'.format(zipkey, wdir)
-    input_zip = _zip_cache.get(zipkey)
-    if input_zip is None:
-        _zip_cache[zipkey] = input_zip = redis_conn.get(zipkey)
-    with zipfile.ZipFile(StringIO.StringIO(input_zip), 'r') as zf:
-        zf.extractall()
     try:
-        run_mdao.run_one('mdao_config.json', *args)
-    except Exception as exc:
-        self.retry(exc=exc)
-    os.chdir('/')
-    shutil.rmtree(wdir)
+        if len(_zip_cache) > 10:
+            _zip_cache.clear()
+        wdir = tempfile.mkdtemp(prefix='mdao-')
+        os.chdir(wdir)
+        print 'Executing {} in {}'.format(zipkey, wdir)
+        input_zip = _zip_cache.get(zipkey)
+        if input_zip is None:
+            _zip_cache[zipkey] = input_zip = redis_conn.get(zipkey)
+        with zipfile.ZipFile(StringIO.StringIO(input_zip), 'r') as zf:
+            zf.extractall()
+        try:
+            run_mdao.run_one('mdao_config.json', *args)
+        except Exception as exc:
+            self.retry(exc=exc)
+        os.chdir('/')
+        shutil.rmtree(wdir)
+    except WindowsError as e:
+        raise OSError(e.errno, traceback.traceback.format_exc())
+
 
 if __name__ == '__main__':
     input_filename = 'mdao_config.json' if len(sys.argv) <= 1 else sys.argv[1]
