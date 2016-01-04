@@ -98,7 +98,7 @@ class PredeterminedRunsDriver(openmdao.api.PredeterminedRunsDriver):
         if not runlist:
             runlist = [list(run) for run in self._build_runlist()]
         if self.use_restart:
-            RestartRecorder.serialize_runlist(self.original_dir, runlist)
+            RestartRecorder.serialize_runlist(self.original_dir, runlist, self._num_par_doe)
         return runlist
 
 

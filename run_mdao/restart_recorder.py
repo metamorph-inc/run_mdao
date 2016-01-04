@@ -42,7 +42,7 @@ class RestartRecorder(object):
             return runlist
 
     @classmethod
-    def serialize_runlist(cls, original_dir, runlist):
+    def serialize_runlist(cls, original_dir, runlist, comm_size):
         with open(os.path.join(original_dir, RestartRecorder.RESTART_RUNLIST_FILENAME), 'wb') as restart_runlist:
             restart_runlist.write(str(len(runlist)) + '\n')
             writer = csv.writer(restart_runlist)
@@ -51,7 +51,7 @@ class RestartRecorder(object):
             for run in runlist:
                 writer.writerow([p[1] for p in run])
         with open(os.path.join(original_dir, RestartRecorder.RESTART_PROGRESS_FILENAME), 'wb') as restart_progress_file:
-            restart_progress_file.write('{}')
+            restart_progress_file.write(json.dumps({i: 0 for i in range(comm_size)}))
 
     def __init__(self, original_dir, comm):
         super(RestartRecorder, self).__init__()
