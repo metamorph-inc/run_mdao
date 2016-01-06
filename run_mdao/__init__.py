@@ -10,6 +10,7 @@ import tempfile
 import socket
 import zipfile
 import StringIO
+import contextlib
 import numpy
 import six
 
@@ -77,7 +78,7 @@ def _memoize_solve(fn):
 
 def _get_param_name(param_name, component_type=None):
     """OpenMDAO won't let us have a parameter and output of the same name..."""
-    if component_type == 'FMU':  # FIXME
+    if component_type is not None and component_type not in ('IndepVarComp', 'TestBenchComponent', 'EnumMap'):
         return param_name
     return 'param_{}'.format(param_name)
 
@@ -147,12 +148,12 @@ class TestBenchComponent(Component):
 
         self._write_testbench_manifest(self.original_testbench_manifest)
 
-        ret_code = self._run_testbench()
+        self.ret_code = self._run_testbench()
 
         testbench_manifest = self._read_testbench_manifest()
 
         for metric_name in self.mdao_config['components'][self.name].get('unknowns', {}):
-            if ret_code != 0:
+            if self.ret_code != 0:
                 unknowns[metric_name] = None
             for testbench_metric in testbench_manifest['Metrics']:
                 if metric_name == testbench_metric['Name']:
@@ -225,6 +226,35 @@ def run_one(filename, input):
     run(filename, override_driver=OneInputDriver())
 
 
+def instantiate_component(component, component_name, mdao_config, root):
+    component_type = component.get('type', 'TestBenchComponent')
+    if component_type == 'IndepVarComp':
+        def get_unknown_val(unknown):
+            if unknown.get('type') is None:
+                return unknown['value']
+            return {'double': float,
+                    'int': int,
+                    'string': six.text_type}[unknown['type']](unknown['value'])
+        vars = ((name, get_unknown_val(unknown), {'pass_by_obj': True}) for name, unknown in component['unknowns'].iteritems())
+        return IndepVarComp(vars)
+    elif component_type == 'TestBenchComponent':
+        tb = TestBenchComponent(component_name, mdao_config, root)
+        # FIXME verify this works properly and re-enable
+        # tb.solve_nonlinear = _memoize_solve(tb.solve_nonlinear)
+
+        return tb
+    elif component_type == 'EnumMap':
+        return EnumMapper(component['details']['config'], param_name=_get_param_name('input'))
+    elif component_type == 'FMU':
+        return FmuWrapper(component['details']['fmu'])
+    else:
+        if '.' in component_type:
+            component_instance = importlib.import_module('.'.join(component_type.split('.')[:-1]))[component_type.split('.')[-1]](**component['details'])
+        else:
+            component_instance = locals()[component_type](**component['details'])
+        return component_instance
+
+
 def run(filename, override_driver=None):
     original_dir = os.path.dirname(os.path.abspath(filename))
     if MPI:
@@ -232,6 +262,12 @@ def run(filename, override_driver=None):
     else:
         with open(filename, 'rb') as mdao_config_json:
             mdao_config = json.loads(mdao_config_json.read())
+    with with_problem(mdao_config, original_dir, override_driver) as top:
+        top.run()
+
+
+@contextlib.contextmanager
+def with_problem(mdao_config, original_dir, override_driver=None):
     # TODO: can we support more than one driver
     driver = next(iter(mdao_config['drivers'].values()))
 
@@ -281,11 +317,7 @@ def run(filename, override_driver=None):
             if recorder['type'] == 'DriverCsvRecorder':
                 mode = 'wb'
                 if RestartRecorder.is_restartable(original_dir):
-                    try:
-                        if os.path.getmtime(recorder['filename']) > os.path.getmtime(filename):
-                            mode = 'ab'
-                    except OSError:
-                        pass
+                    mode = 'ab'
                 recorder = MappingCsvRecorder({}, unknowns_map, open(recorder['filename'], mode))
                 if mode == 'ab':
                     recorder._wrote_header = True
@@ -361,32 +393,8 @@ def run(filename, override_driver=None):
         tbs_sorted = get_sorted_components()
         for component_name in tbs_sorted:
             component = mdao_config['components'][component_name]
-            component_type = component.get('type', 'TestBenchComponent')
-            if component_type == 'IndepVarComp':
-                def get_unknown_val(unknown):
-                    if unknown.get('type') is None:
-                        return unknown['value']
-                    return {'double': float,
-                            'int': int,
-                            'string': six.text_type}[unknown['type']](unknown['value'])
-                vars = ((name, get_unknown_val(unknown), {'pass_by_obj': True}) for name, unknown in component['unknowns'].iteritems())
-                root.add(component_name, IndepVarComp(vars))
-            elif component_type == 'TestBenchComponent':
-                tb = TestBenchComponent(component_name, mdao_config, root)
-                # FIXME verify this works properly and re-enable
-                # tb.solve_nonlinear = _memoize_solve(tb.solve_nonlinear)
-
-                root.add(component_name, tb)
-            elif component_type == 'EnumMap':
-                root.add(component_name, EnumMapper(component['details']['config'], param_name=_get_param_name('input')))
-            elif component_type == 'FMU':
-                root.add(component_name, FmuWrapper(component['details']['fmu']))
-            else:
-                if '.' in component_type:
-                    component_instance = importlib.import_module('.'.join(component_type.split('.')[:-1]))[component_type.split('.')[-1]](**component['details'])
-                else:
-                    component_instance = locals()[component_type](**component['details'])
-                root.add(component_name, component_instance)
+            mdao_component = instantiate_component(component, component_name, mdao_config, root)
+            root.add(component_name, mdao_component)
 
         for component_name, component in mdao_config['components'].iteritems():
             for parameter_name, parameter in component.get('parameters', {}).iteritems():
@@ -407,7 +415,7 @@ def run(filename, override_driver=None):
         top.setup()
         # from openmdao.devtools.debug import dump_meta
         # dump_meta(top.root)
-        top.run()
+        yield top
     finally:
         for recorder in recorders:
             recorder.close()
