@@ -14,7 +14,7 @@ import contextlib
 import numpy
 import six
 
-from run_mdao.csv_recorder import MappingCsvRecorder
+from run_mdao.csv_recorder import MappingCsvRecorder, CsvRecorder
 from run_mdao.enum_mapper import EnumMapper
 from run_mdao.drivers import FullFactorialDriver, UniformDriver, LatinHypercubeDriver, OptimizedLatinHypercubeDriver, PredeterminedRunsDriver
 from run_mdao.restart_recorder import RestartRecorder
@@ -321,6 +321,8 @@ def with_problem(mdao_config, original_dir, override_driver=None):
                 recorder = MappingCsvRecorder({}, unknowns_map, open(recorder['filename'], mode))
                 if mode == 'ab':
                     recorder._wrote_header = True
+            elif recorder['type'] == 'AllCsvRecorder':
+                recorder = CsvRecorder(out=open(recorder['filename'], mode))
             elif recorder['type'] == 'CouchDBRecorder':
                 recorder = CouchDBRecorder(recorder.get('url', 'http://localhost:5984/'), recorder['run_id'])
                 recorder.options['record_params'] = True

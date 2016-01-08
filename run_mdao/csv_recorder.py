@@ -24,14 +24,16 @@ class CsvRecorder(BaseRecorder):
 
     def record_iteration(self, params, unknowns, resids, metadata):
         if self._wrote_header is False:
-            self.writer.writerow([param for param in params] + [unknown for unknown in unknowns])
+            self.param_names = [param for param in params]
+            self.unknown_names = [unknown for unknown in unknowns]
+            self.writer.writerow(self.param_names + self.unknown_names)
             self._wrote_header = True
 
         def munge(val):
             if isinstance(val, numpy.ndarray):
                 return ",".join(map(str, val))
             return str(val)
-        self.writer.writerow([munge(value['val']) for value in params.values()] + [munge(value['val']) for value in unknowns.values()])
+        self.writer.writerow([munge(params[param_name]) for param_name in self.param_names] + [munge(unknowns[unknown_name]) for unknown_name in self.unknown_names])
 
         if self.out:
             self.out.flush()
