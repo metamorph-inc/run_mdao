@@ -12,6 +12,7 @@ task = run_mdao.celery_tasks.run_one.delay(r"run_mdao\test\mdao_config_basic_CyP
 task.get(timeout=4)
 """
 from __future__ import absolute_import
+from __future__ import print_function
 
 from celery import Celery
 import redis
@@ -69,7 +70,7 @@ def run_one(self, zipkey, *args):
             _zip_cache.clear()
         wdir = tempfile.mkdtemp(prefix='mdao-')
         os.chdir(wdir)
-        print 'Executing {} in {}'.format(zipkey, wdir)
+        print('Executing {} in {}'.format(zipkey, wdir))
         input_zip = _zip_cache.get(zipkey)
         if input_zip is None:
             _zip_cache[zipkey] = input_zip = redis_conn.get(zipkey)

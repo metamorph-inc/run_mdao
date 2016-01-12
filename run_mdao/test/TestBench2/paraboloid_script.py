@@ -1,4 +1,5 @@
 from __future__ import absolute_import
+from __future__ import print_function
 import sys
 import os
 import os.path
@@ -9,11 +10,11 @@ import six
 
 
 def log(s):
-    print s
+    print(s)
 
 
 def log_formatted(s):
-    print s
+    print(s)
 try:
     import CyPhyPython  # will fail if not running under CyPhyPython
     import cgi
