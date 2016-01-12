@@ -1,4 +1,5 @@
 from __future__ import print_function
+from __future__ import absolute_import
 from openmdao.core.component import Component
 from collections import Counter
 import sys

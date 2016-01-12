@@ -1,4 +1,5 @@
 from __future__ import print_function
+from __future__ import absolute_import
 import sys
 import os
 import os.path
@@ -328,7 +329,7 @@ def with_problem(mdao_config, original_dir, override_driver=None):
                 recorder.options['record_params'] = True
                 recorder.options['record_unknowns'] = True
                 recorder.options['record_resids'] = False
-                recorder.options['includes'] = unknowns_map.keys()
+                recorder.options['includes'] = list(unknowns_map.keys())
             top.driver.add_recorder(recorder)
         return recorders
 

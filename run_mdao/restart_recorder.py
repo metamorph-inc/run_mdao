@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 import threading
 import json
 import os.path
@@ -7,6 +8,7 @@ import shutil
 from openmdao.util.array_util import evenly_distrib_idxs
 
 from openmdao.core.mpi_wrap import MPI
+from six.moves import range
 
 
 class RestartRecorder(object):

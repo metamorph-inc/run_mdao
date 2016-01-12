@@ -1,4 +1,5 @@
 from __future__ import print_function
+from __future__ import absolute_import
 import numpy
 import itertools
 
@@ -14,6 +15,8 @@ import random
 from random import shuffle, randint
 import numpy as np
 from six import moves, itervalues, iteritems
+from six.moves import range
+from six.moves import zip
 
 
 class PredeterminedRunsDriver(openmdao.api.PredeterminedRunsDriver):
@@ -127,7 +130,7 @@ class FullFactorialDriver(PredeterminedRunsDriver):
 
         keys = list(value_arrays.keys())
         for combination in itertools.product(*value_arrays.values()):
-            yield moves.zip(keys, combination)
+            yield zip(keys, combination)
 
 
 class UniformDriver(PredeterminedRunsDriver):
@@ -144,7 +147,7 @@ class UniformDriver(PredeterminedRunsDriver):
             elif metadata.get('type') == 'int':
                 return numpy.random.randint(metadata['lower'], metadata['upper'] + 1)
 
-        for i in moves.xrange(self.num_samples):
+        for i in range(self.num_samples):
             yield ((key, sample_var(metadata)) for key, metadata in iteritems(self.get_desvar_metadata()))
 
 
@@ -161,7 +164,7 @@ class LatinHypercubeDriver(PredeterminedRunsDriver):
             metadata = design_vars[design_var_name]
             if metadata.get('type', 'double') == 'double':
                 bucket_walls = numpy.linspace(metadata['lower'], metadata['upper'], num=self.num_samples + 1)
-                buckets[design_var_name] = [numpy.random.uniform(low, high) for low, high in moves.zip(bucket_walls[0:-1], bucket_walls[1:])]
+                buckets[design_var_name] = [numpy.random.uniform(low, high) for low, high in zip(bucket_walls[0:-1], bucket_walls[1:])]
             elif metadata.get('type') == 'enum':
                 # length is generated such that all items have an equal chance of appearing when num_samples % len(items) != 0
                 length = self.num_samples + (-self.num_samples % len(metadata['items']))
@@ -174,7 +177,7 @@ class LatinHypercubeDriver(PredeterminedRunsDriver):
 
             numpy.random.shuffle(buckets[design_var_name])
 
-        for i in moves.xrange(self.num_samples):
+        for i in range(self.num_samples):
             yield ((key, values[i]) for key, values in iteritems(buckets))
 
 
@@ -213,12 +216,12 @@ class OptimizedLatinHypercubeDriver(PredeterminedRunsDriver):
                 enums[design_var_name] = values
             elif metadata.get('type', 'double') == 'int':
                 low, high = int(metadata['lower']), int(metadata['upper'])
-                values = list(moves.xrange(low, high + 1))
+                values = list(range(low, high + 1))
                 numpy.random.shuffle(values)
                 enums[design_var_name] = values
 
         # Return random values in given buckets
-        for i in moves.xrange(self.num_samples):
+        for i in range(self.num_samples):
             def get_random_in_bucket(design_var, bucket):
                 metadata = design_vars[design_var]
                 if metadata.get('type') == 'enum':
@@ -344,8 +347,8 @@ class _LHC_Individual(object):
 def _rand_latin_hypercube(n, k):
     # Calculates a random Latin hypercube set of n points in k dimensions within [0,n-1]^k hypercube.
     arr = np.zeros((n, k))
-    row = list(moves.xrange(0, n))
-    for i in moves.xrange(k):
+    row = list(range(0, n))
+    for i in range(k):
         shuffle(row)
         arr[:, i] = row
     return arr

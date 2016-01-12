@@ -4,6 +4,7 @@ setup.py bdist_wheel
 or install in editable mode with
 Scripts\pip install -e path\to\run_mdao
 """
+from __future__ import absolute_import
 from setuptools import setup
 
 setup(

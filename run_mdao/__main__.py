@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 import run_mdao
 import argparse
 import json

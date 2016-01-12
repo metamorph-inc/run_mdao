@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 import sys
 import csv
 import six
@@ -6,6 +7,7 @@ from collections import OrderedDict
 import numpy
 
 from openmdao.recorders.base_recorder import BaseRecorder
+from six.moves import map
 
 
 class CsvRecorder(BaseRecorder):

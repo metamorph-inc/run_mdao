@@ -1,10 +1,12 @@
-﻿
+﻿from __future__ import absolute_import
+
 import sys
 import os
 import os.path
 import shutil
 import json
 import numpy
+import six
 
 
 def log(s):
@@ -63,7 +65,7 @@ if __name__ == '__main__':
         testbench_manifest = json.loads(testbench_manifest_json.read())
 
     def unwrap(val):
-        if isinstance(val, unicode) or isinstance(val, str):
+        if isinstance(val, six.string_types):
             return float(val)
         if isinstance(val, list):
             return numpy.array(val)

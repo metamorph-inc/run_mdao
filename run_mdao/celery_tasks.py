@@ -11,6 +11,7 @@ import run_mdao.celery_tasks
 task = run_mdao.celery_tasks.run_one.delay(r"run_mdao\test\mdao_config_basic_CyPhy.json", {"designVariable.x": "Ia", "designVariable.y": -50.0})
 task.get(timeout=4)
 """
+from __future__ import absolute_import
 
 from celery import Celery
 import redis
@@ -26,6 +27,7 @@ import zipfile
 import hashlib
 import shutil
 import traceback
+import six
 
 # if running the worker with gevent, we need to patch subprocess or the inspect and control commands will time out
 # celery worker runs monkey.patch_all, but it does not patch subprocess
@@ -92,7 +94,7 @@ if __name__ == '__main__':
     with zipfile.ZipFile(zbuff, 'w') as zf:
         # this might be too fancy, we can zip everything in 'root_dir'
         # FIXME will not work for FMU components
-        for component in mdao_config['components'].itervalues():
+        for component in six.itervalues(mdao_config['components']):
             try:
                 component_dir = component['details']['directory']
             except KeyError:

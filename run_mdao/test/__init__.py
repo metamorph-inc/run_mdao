@@ -1,4 +1,5 @@
 """Runs a simple regression test."""
+from __future__ import absolute_import
 
 import run_mdao
 import glob
