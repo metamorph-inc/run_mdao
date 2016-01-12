@@ -15,7 +15,7 @@ if __name__ == '__main__':
 
     if args.one_component:
         filename = args.filename
-        with open(filename, 'rb') as mdao_config_json:
+        with open(filename, 'r') as mdao_config_json:
             mdao_config = json.load(mdao_config_json)
         component = mdao_config['components'][args.one_component]
         if component.get('type') == 'IndepVarComp':

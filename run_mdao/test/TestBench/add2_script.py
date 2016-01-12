@@ -52,13 +52,13 @@ def invoke(focusObject, rootObject, componentParameters, **kwargs):
     componentParameters['runCommand'] = 'Python.exe ' + os.path.basename(__file__)
     # componentParameters['labels'] = 'Windows'
 
-    with open(__file__, 'rb') as this_py:
-        with open(os.path.join(output_dir, os.path.basename(__file__)), 'wb') as output:
+    with open(__file__, 'r') as this_py:
+        with open(os.path.join(output_dir, os.path.basename(__file__)), 'w') as output:
             output.write(this_py.read())
 
 # Phase 2: called by OpenMDAO
 if __name__ == '__main__':
-    with open('testbench_manifest.json', 'rb') as testbench_manifest_json:
+    with open('testbench_manifest.json', 'r') as testbench_manifest_json:
         testbench_manifest = json.loads(testbench_manifest_json.read())
 
     def unwrap(val):
@@ -81,5 +81,5 @@ if __name__ == '__main__':
         if isinstance(metric['Value'], numpy.ndarray):
             metric['Value'] = metric['Value'].tolist()
     output = json.dumps(testbench_manifest, indent=4)
-    with open('testbench_manifest.json', 'wb') as testbench_manifest_json:
+    with open('testbench_manifest.json', 'w') as testbench_manifest_json:
         testbench_manifest_json.write(output)

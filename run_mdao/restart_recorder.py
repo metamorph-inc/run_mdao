@@ -28,7 +28,7 @@ class RestartRecorder(object):
             with open(os.path.join(original_dir, RestartRecorder.RESTART_PROGRESS_FILENAME)) as restart_progress_file:
                 restart_progress = json.load(restart_progress_file)
             runlist = []
-            with open(os.path.join(original_dir, RestartRecorder.RESTART_RUNLIST_FILENAME), 'rb') as restart_runlist:
+            with open(os.path.join(original_dir, RestartRecorder.RESTART_RUNLIST_FILENAME), 'r') as restart_runlist:
                 len_runlist = int(restart_runlist.readline())
                 run_sizes, run_offsets = evenly_distrib_idxs(len(restart_progress), len_runlist)
                 already_done_ranges = [(offset, offset + restart_progress[str(i)]) for i, offset in enumerate(run_offsets)] + [(float("inf"), float("inf"))]
@@ -43,14 +43,14 @@ class RestartRecorder(object):
 
     @classmethod
     def serialize_runlist(cls, original_dir, runlist, comm_size):
-        with open(os.path.join(original_dir, RestartRecorder.RESTART_RUNLIST_FILENAME), 'wb') as restart_runlist:
+        with open(os.path.join(original_dir, RestartRecorder.RESTART_RUNLIST_FILENAME), 'w') as restart_runlist:
             restart_runlist.write(str(len(runlist)) + '\n')
             writer = csv.writer(restart_runlist)
             header = list(p[0] for p in runlist[0])
             writer.writerow(header)
             for run in runlist:
                 writer.writerow([p[1] for p in run])
-        with open(os.path.join(original_dir, RestartRecorder.RESTART_PROGRESS_FILENAME), 'wb') as restart_progress_file:
+        with open(os.path.join(original_dir, RestartRecorder.RESTART_PROGRESS_FILENAME), 'w') as restart_progress_file:
             restart_progress_file.write(json.dumps({i: 0 for i in range(comm_size)}))
 
     def __init__(self, original_dir, comm):
@@ -86,7 +86,7 @@ class RestartRecorder(object):
         try:
             self.progress_by_rank[rank] = self.progress_by_rank[rank] + 1
             tmp_output = self.output_filename + '.tmp'
-            with open(tmp_output, 'wb') as output:
+            with open(tmp_output, 'w') as output:
                 json.dump(self.progress_by_rank, output)
             shutil.move(tmp_output, self.output_filename)
         finally:

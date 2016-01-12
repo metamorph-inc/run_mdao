@@ -23,7 +23,7 @@ def run_regression(output_filename):
 
 def main():
     tb_json_names = glob.glob(os.path.join(_this_dir, '*/testbench_manifest.json'))
-    tb_jsons = [(tb_json_name, open(tb_json_name, 'rb').read()) for tb_json_name in tb_json_names]
+    tb_jsons = [(tb_json_name, open(tb_json_name, 'r').read()) for tb_json_name in tb_json_names]
     try:
         for input_filename in glob.glob(_this_dir + '/mdao_config*json'):
             output_filename = input_filename + '.output.csv'
@@ -31,7 +31,7 @@ def main():
                     run_mdao.run(input_filename)
     finally:
         for tb_json_name, contents in tb_jsons:
-            with open(tb_json_name, 'wb') as tb_json:
+            with open(tb_json_name, 'w') as tb_json:
                 tb_json.write(contents)
 
     with run_regression(os.path.join(_this_dir, 'single_run.csv')):

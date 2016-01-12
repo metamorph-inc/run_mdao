@@ -9,7 +9,6 @@ import time
 import tempfile
 import socket
 import zipfile
-import StringIO
 import contextlib
 import numpy
 import six
@@ -64,14 +63,14 @@ def _memoize_solve(fn):
         memoized_unknowns = memo.get(hashable, None)
         if memoized_unknowns:
             # print('cache hit')
-            for name, value in memoized_unknowns.iteritems():
+            for name, value in six.iteritems(memoized_unknowns):
                 unknowns[name] = value
             return
         start = time.time()
         fn(tb_params, unknowns, resids=resids)
         if time.time() - start >= CACHE_THRESHOLD_SECONDS:
-            # memo[hashable] = {key: (value['val'].val if value.get('pass_by_obj', False) else value['val']) for key, value in unknowns.iteritems()}
-            memo[hashable] = {key: (value['val']) for key, value in unknowns.iteritems()}
+            # memo[hashable] = {key: (value['val'].val if value.get('pass_by_obj', False) else value['val']) for key, value in six.iteritems(unknowns)}
+            memo[hashable] = {key: (value['val']) for key, value in six.iteritems(unknowns)}
 
     return solve_nonlinear
 
@@ -95,7 +94,7 @@ class TestBenchComponent(Component):
 
         self.fd_options['force_fd'] = True
 
-        for param_name, param in mdao_config['components'][name].get('parameters', {}).iteritems():
+        for param_name, param in six.iteritems(mdao_config['components'][name].get('parameters', {})):
             pass_by_obj = source_is_not_driver = param.get('source', [''])[0] not in mdao_config['drivers']
             val = 0.0
             if source_is_not_driver and 'source' in param:
@@ -108,17 +107,17 @@ class TestBenchComponent(Component):
 
             self.add_param(_get_param_name(param_name), val=val, pass_by_obj=pass_by_obj)
 
-        for metric_name, _ in mdao_config['components'][name].get('unknowns', {}).iteritems():
+        for metric_name, _ in six.iteritems(mdao_config['components'][name].get('unknowns', {})):
             self.add_output(metric_name, val=0.0, pass_by_obj=True)
 
     def _read_testbench_manifest(self):
-        with open(os.path.join(self.directory, 'testbench_manifest.json'), 'rb') as testbench_manifest_json:
+        with open(os.path.join(self.directory, 'testbench_manifest.json'), 'r') as testbench_manifest_json:
             return json.loads(testbench_manifest_json.read())
 
     def _write_testbench_manifest(self, testbench_manifest):
         # print(repr(testbench_manifest))
         output = json.dumps(testbench_manifest, indent=4)
-        with open(os.path.join(self.directory, 'testbench_manifest.json'), 'wb') as testbench_manifest_json:
+        with open(os.path.join(self.directory, 'testbench_manifest.json'), 'w') as testbench_manifest_json:
             testbench_manifest_json.write(output)
 
     def _run_testbench(self):
@@ -126,7 +125,7 @@ class TestBenchComponent(Component):
 
     def solve_nonlinear(self, params, unknowns, resids):
         # FIXME: without dict(), this returns wrong values. why?
-        for param_name, val in dict(params).iteritems():
+        for param_name, val in six.iteritems(dict(params)):
             param_name = param_name[len(_get_param_name('')):]
             for manifest_param in self.original_testbench_manifest['Parameters']:
                 if manifest_param['Name'] == param_name:
@@ -177,7 +176,7 @@ def par_clone_and_config(filename):
 
     # Distributing the config from root node to every worker
     if rank == 0:
-        with open(filename, 'rb') as mdao_config_json:
+        with open(filename, 'r') as mdao_config_json:
             mdao_config = json.loads(mdao_config_json.read())
         # Extra info if SFTP/SCP is used to pull from root
         root_ip = socket.gethostbyname(socket.gethostname())
@@ -189,10 +188,10 @@ def par_clone_and_config(filename):
 
     # Distributing all artifacts (via MPI, for now)
     if rank == 0:
-        zbuff = StringIO.StringIO()
+        zbuff = six.BytesIO()
         with zipfile.ZipFile(zbuff, 'w') as zf:
             # this might be too fancy, we can zip everyhting in 'root_dir'
-            for component in mdao_config['components'].itervalues():
+            for component in six.itervalues(mdao_config['components']):
                 try:
                     component_dir = component['details']['directory']
                 except KeyError:
@@ -235,7 +234,7 @@ def instantiate_component(component, component_name, mdao_config, root):
             return {'double': float,
                     'int': int,
                     'string': six.text_type}[unknown['type']](unknown['value'])
-        vars = ((name, get_unknown_val(unknown), {'pass_by_obj': True}) for name, unknown in component['unknowns'].iteritems())
+        vars = ((name, get_unknown_val(unknown), {'pass_by_obj': True}) for name, unknown in six.iteritems(component['unknowns']))
         return IndepVarComp(vars)
     elif component_type == 'TestBenchComponent':
         tb = TestBenchComponent(component_name, mdao_config, root)
@@ -260,7 +259,7 @@ def run(filename, override_driver=None):
     if MPI:
         mdao_config = par_clone_and_config(filename)
     else:
-        with open(filename, 'rb') as mdao_config_json:
+        with open(filename, 'r') as mdao_config_json:
             mdao_config = json.loads(mdao_config_json.read())
     with with_problem(mdao_config, original_dir, override_driver) as top:
         top.run()
@@ -305,9 +304,9 @@ def with_problem(mdao_config, original_dir, override_driver=None):
     def add_recorders():
         recorders = []
         design_var_map = {get_desvar_path(designVariable): designVariable for designVariable in driver['designVariables']}
-        objective_map = {'{}.{}'.format(objective['source'][0], objective['source'][1]): objective_name for objective_name, objective in driver['objectives'].iteritems()}
+        objective_map = {'{}.{}'.format(objective['source'][0], objective['source'][1]): objective_name for objective_name, objective in six.iteritems(driver['objectives'])}
         constants_map = {}
-        for name, constant in (c for c in mdao_config['components'].iteritems() if c[1].get('type', 'TestBenchComponent') == 'IndepVarComp'):
+        for name, constant in (c for c in six.iteritems(mdao_config['components']) if c[1].get('type', 'TestBenchComponent') == 'IndepVarComp'):
             constants_map.update({'{}.{}'.format(name, unknown): unknown for unknown in constant['unknowns']})
 
         unknowns_map = design_var_map
@@ -315,11 +314,11 @@ def with_problem(mdao_config, original_dir, override_driver=None):
         unknowns_map.update(constants_map)
         for recorder in mdao_config.get('recorders', [{'type': 'DriverCsvRecorder', 'filename': 'output.csv'}]):
             if recorder['type'] == 'DriverCsvRecorder':
-                mode = 'wb'
+                mode = 'w'
                 if RestartRecorder.is_restartable(original_dir):
-                    mode = 'ab'
+                    mode = 'a'
                 recorder = MappingCsvRecorder({}, unknowns_map, open(recorder['filename'], mode))
-                if mode == 'ab':
+                if mode == 'a':
                     recorder._wrote_header = True
             elif recorder['type'] == 'AllCsvRecorder':
                 recorder = CsvRecorder(out=open(recorder['filename'], mode))
@@ -336,7 +335,7 @@ def with_problem(mdao_config, original_dir, override_driver=None):
 
     try:
         driver_vars = []
-        for var_name, var in driver['designVariables'].iteritems():
+        for var_name, var in six.iteritems(driver['designVariables']):
             if var.get('type', 'double') == 'double':
                 driver_vars.append((var_name, 0.0))
             elif var['type'] == 'enum':
@@ -347,7 +346,7 @@ def with_problem(mdao_config, original_dir, override_driver=None):
                 raise ValueError('Unimplemented designVariable type "{}"'.format(var['type']))
 
         root.add(get_desvar_path('').split('.')[0], IndepVarComp(driver_vars))
-        for var_name, var in driver['designVariables'].iteritems():
+        for var_name, var in six.iteritems(driver['designVariables']):
             if var.get('type', 'double') == 'double':
                 top.driver.add_desvar(get_desvar_path(var_name), lower=var.get('RangeMin'), upper=var.get('RangeMax'))
             elif var['type'] == 'enum':
@@ -398,8 +397,8 @@ def with_problem(mdao_config, original_dir, override_driver=None):
             mdao_component = instantiate_component(component, component_name, mdao_config, root)
             root.add(component_name, mdao_component)
 
-        for component_name, component in mdao_config['components'].iteritems():
-            for parameter_name, parameter in component.get('parameters', {}).iteritems():
+        for component_name, component in six.iteritems(mdao_config['components']):
+            for parameter_name, parameter in six.iteritems(component.get('parameters', {})):
                 if parameter.get('source'):
                     source = parameter['source']
                     if source[0] in mdao_config['drivers']:
@@ -411,7 +410,7 @@ def with_problem(mdao_config, original_dir, override_driver=None):
                     pass  # TODO warn or fail?
 
         if driver['type'] == 'optimizer':
-            for objective in driver['objectives'].itervalues():
+            for objective in six.itervalues(driver['objectives']):
                 top.driver.add_objective(str('.'.join(objective['source'])))
 
         top.setup()

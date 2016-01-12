@@ -110,7 +110,7 @@ class FullFactorialDriver(PredeterminedRunsDriver):
     def _build_runlist(self):
         # Set up Uniform distribution arrays
         value_arrays = dict()
-        for name, value in self.get_desvar_metadata().iteritems():
+        for name, value in iteritems(self.get_desvar_metadata()):
             if value.get('type', 'double') == 'double':
                 low = value['lower']
                 high = value['upper']
@@ -145,7 +145,7 @@ class UniformDriver(PredeterminedRunsDriver):
                 return numpy.random.randint(metadata['lower'], metadata['upper'] + 1)
 
         for i in moves.xrange(self.num_samples):
-            yield ((key, sample_var(metadata)) for key, metadata in self.get_desvar_metadata().iteritems())
+            yield ((key, sample_var(metadata)) for key, metadata in iteritems(self.get_desvar_metadata()))
 
 
 class LatinHypercubeDriver(PredeterminedRunsDriver):
@@ -175,7 +175,7 @@ class LatinHypercubeDriver(PredeterminedRunsDriver):
             numpy.random.shuffle(buckets[design_var_name])
 
         for i in moves.xrange(self.num_samples):
-            yield ((key, values[i]) for key, values in buckets.iteritems())
+            yield ((key, values[i]) for key, values in iteritems(buckets))
 
 
 class OptimizedLatinHypercubeDriver(PredeterminedRunsDriver):
