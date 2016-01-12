@@ -54,12 +54,12 @@ def invoke(focusObject, rootObject, componentParameters, **kwargs):
 
     with open(__file__, 'r') as this_py:
         log(os.path.join(output_dir, __file__))
-        with open(os.path.join(output_dir, os.path.basename(__file__)), 'b') as output:
+        with open(os.path.join(output_dir, os.path.basename(__file__)), 'w') as output:
             output.write(this_py.read())
 
 # Phase 2: called by OpenMDAO
 if __name__ == '__main__':
-    with open('testbench_manifest.json', 'b') as testbench_manifest_json:
+    with open('testbench_manifest.json', 'r') as testbench_manifest_json:
         testbench_manifest = json.loads(testbench_manifest_json.read())
 
     def unwrap(val):

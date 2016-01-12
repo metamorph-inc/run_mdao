@@ -2,6 +2,7 @@ from __future__ import print_function
 import sys
 import os
 import os.path
+import io
 import json
 import subprocess
 import importlib
@@ -314,11 +315,11 @@ def with_problem(mdao_config, original_dir, override_driver=None):
         unknowns_map.update(constants_map)
         for recorder in mdao_config.get('recorders', [{'type': 'DriverCsvRecorder', 'filename': 'output.csv'}]):
             if recorder['type'] == 'DriverCsvRecorder':
-                mode = 'w'
+                mode = 'wb'
                 if RestartRecorder.is_restartable(original_dir):
-                    mode = 'a'
-                recorder = MappingCsvRecorder({}, unknowns_map, open(recorder['filename'], mode))
-                if mode == 'a':
+                    mode = 'ab'
+                recorder = MappingCsvRecorder({}, unknowns_map, io.open(recorder['filename'], mode))
+                if mode == 'ab':
                     recorder._wrote_header = True
             elif recorder['type'] == 'AllCsvRecorder':
                 recorder = CsvRecorder(out=open(recorder['filename'], mode))
