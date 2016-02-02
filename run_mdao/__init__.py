@@ -250,7 +250,9 @@ def instantiate_component(component, component_name, mdao_config, root):
         return FmuWrapper(component['details']['fmu'])
     else:
         if '.' in component_type:
-            component_instance = importlib.import_module('.'.join(component_type.split('.')[:-1]))[component_type.split('.')[-1]](**component['details'])
+            mod_name = '.'.join(component_type.split('.')[:-1])
+            class_name = component_type.split('.')[-1]
+            component_instance = getattr(importlib.import_module(mod_name), class_name)(**component['details'])
         else:
             component_instance = locals()[component_type](**component['details'])
         return component_instance
@@ -343,7 +345,7 @@ def with_problem(mdao_config, original_dir, override_driver=None):
             elif var['type'] == 'enum':
                 driver_vars.append((var_name, u'', {"pass_by_obj": True}))
             elif var['type'] == 'int':
-                driver_vars.append((var_name, 0.0))
+                driver_vars.append((var_name, 0))
             else:
                 raise ValueError('Unimplemented designVariable type "{}"'.format(var['type']))
 
