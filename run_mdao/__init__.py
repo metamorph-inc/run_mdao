@@ -102,6 +102,7 @@ class TestBenchComponent(Component):
             if source_is_not_driver and 'source' in param:
                 source_component = {c.name: c for c in root.components()}[param['source'][0]]
                 val = source_component._init_unknowns_dict[param['source'][-1]]['val']
+                pass_by_obj = source_component._init_unknowns_dict[param['source'][-1]].get('pass_by_obj', False)
             elif 'source' in param:
                 if mdao_config['drivers'][param['source'][0]]['designVariables'][param['source'][-1]].get('type') == "enum":
                     val = u''
