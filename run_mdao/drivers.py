@@ -34,8 +34,8 @@ class PredeterminedRunsDriver(openmdao.api.PredeterminedRunsDriver):
         self.original_dir = original_dir
         self.use_restart = True
 
-    def _setup_communicators(self, comm):
-        super(PredeterminedRunsDriver, self)._setup_communicators(comm)
+    def _setup_communicators(self, comm, parent_dir):
+        super(PredeterminedRunsDriver, self)._setup_communicators(comm, parent_dir)
         if self.use_restart:
             self.restart = RestartRecorder(self.original_dir, comm)
 
