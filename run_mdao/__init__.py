@@ -96,6 +96,12 @@ class TestBenchComponent(Component):
 
         self.fd_options['force_fd'] = True
 
+        def get_meta(param):
+            units = param.get('units')
+            if units:
+                return {'units': str(units)}
+            else:
+                return {}
         for param_name, param in six.iteritems(mdao_config['components'][name].get('parameters', {})):
             pass_by_obj = source_is_not_driver = param.get('source', [''])[0] not in mdao_config['drivers']
             val = 0.0
@@ -108,10 +114,10 @@ class TestBenchComponent(Component):
                     val = u''
                     pass_by_obj = True
 
-            self.add_param(_get_param_name(param_name), val=val, pass_by_obj=pass_by_obj)
+            self.add_param(_get_param_name(param_name), val=val, pass_by_obj=pass_by_obj, **get_meta(param))
 
-        for metric_name, _ in six.iteritems(mdao_config['components'][name].get('unknowns', {})):
-            self.add_output(metric_name, val=0.0, pass_by_obj=True)
+        for metric_name, metric in six.iteritems(mdao_config['components'][name].get('unknowns', {})):
+            self.add_output(metric_name, val=0.0, pass_by_obj=True, **get_meta(metric))
 
     def _read_testbench_manifest(self):
         with open(os.path.join(self.directory, 'testbench_manifest.json'), 'r') as testbench_manifest_json:
@@ -237,7 +243,14 @@ def instantiate_component(component, component_name, mdao_config, root):
             return {'double': float,
                     'int': int,
                     'string': six.text_type}[unknown['type']](unknown['value'])
-        vars = ((name, get_unknown_val(unknown), {'pass_by_obj': True}) for name, unknown in six.iteritems(component['unknowns']))
+
+        def get_unknown_meta(unknown):
+            ret = {'pass_by_obj': True}
+            units = unknown.get('units')
+            if units:
+                ret['units'] = str(units)
+            return ret
+        vars = ((name, get_unknown_val(unknown), get_unknown_meta(unknown)) for name, unknown in six.iteritems(component['unknowns']))
         return IndepVarComp(vars)
     elif component_type == 'TestBenchComponent':
         tb = TestBenchComponent(component_name, mdao_config, root)
