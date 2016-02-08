@@ -339,6 +339,7 @@ def with_problem(mdao_config, original_dir, override_driver=None):
                 if mode == 'ab':
                     recorder._wrote_header = True
             elif recorder['type'] == 'AllCsvRecorder':
+                mode = 'wb'
                 recorder = CsvRecorder(out=open(recorder['filename'], mode))
             elif recorder['type'] == 'CouchDBRecorder':
                 recorder = CouchDBRecorder(recorder.get('url', 'http://localhost:5984/'), recorder['run_id'])
