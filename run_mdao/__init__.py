@@ -49,9 +49,10 @@ else:
 CACHE_THRESHOLD_SECONDS = 5
 
 
-def _memoize_solve(fn):
+def _memoize_solve(component, fn):
     from run_mdao.array_hashable import array_hashable
     memo = {}
+    component.add_output('_runtime', val=0.0)
 
     def solve_nonlinear(tb_params, unknowns, resids):
         # FIXME: without dict(), this returns wrong values. why?
@@ -61,7 +62,7 @@ def _memoize_solve(fn):
             if isinstance(val, numpy.ndarray):
                 return array_hashable(val)
             return val
-        hashable = tuple((unwrap_val(param['val']) for param in tb_params.values()))
+        hashable = tuple((unwrap_val(param) for param in tb_params.values()))
         memoized_unknowns = memo.get(hashable, None)
         if memoized_unknowns:
             # print('cache hit')
@@ -70,6 +71,7 @@ def _memoize_solve(fn):
             return
         start = time.time()
         fn(tb_params, unknowns, resids=resids)
+        unknowns['_runtime'] = time.time() - start
         if time.time() - start >= CACHE_THRESHOLD_SECONDS:
             # memo[hashable] = {key: (value['val'].val if value.get('pass_by_obj', False) else value['val']) for key, value in six.iteritems(unknowns)}
             memo[hashable] = {key: (value['val']) for key, value in six.iteritems(unknowns)}
@@ -118,6 +120,7 @@ class TestBenchComponent(Component):
 
         for metric_name, metric in six.iteritems(mdao_config['components'][name].get('unknowns', {})):
             self.add_output(metric_name, val=0.0, pass_by_obj=True, **get_meta(metric))
+        self.add_output('_ret_code', val=0)
 
     def _read_testbench_manifest(self):
         with open(os.path.join(self.directory, 'testbench_manifest.json'), 'r') as testbench_manifest_json:
@@ -156,7 +159,7 @@ class TestBenchComponent(Component):
 
         self._write_testbench_manifest(self.original_testbench_manifest)
 
-        self.ret_code = self._run_testbench()
+        self.ret_code = unknowns['_ret_code'] = self._run_testbench()
 
         testbench_manifest = self._read_testbench_manifest()
 
@@ -254,8 +257,8 @@ def instantiate_component(component, component_name, mdao_config, root):
         return IndepVarComp(vars)
     elif component_type == 'TestBenchComponent':
         tb = TestBenchComponent(component_name, mdao_config, root)
-        # FIXME verify this works properly and re-enable
-        # tb.solve_nonlinear = _memoize_solve(tb.solve_nonlinear)
+        # FIXME verify this works properly
+        tb.solve_nonlinear = _memoize_solve(tb, tb.solve_nonlinear)
 
         return tb
     elif component_type == 'EnumMap':
