@@ -1,3 +1,8 @@
 *.pyc
 *~
 run_mdao.egg-info
+run_mdao/test/TestBench2/_FAILED.txt
+run_mdao/test/XFOIL_Tier_1/log/
+run_mdao/test/bin.out
+run_mdao/test/differently_named_bin.dat
+run_mdao/test/hosts
