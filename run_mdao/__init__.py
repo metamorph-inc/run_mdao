@@ -245,7 +245,8 @@ def instantiate_component(component, component_name, mdao_config, root):
                 return unknown['value']
             return {'double': float,
                     'int': int,
-                    'string': six.text_type}[unknown['type']](unknown['value'])
+                    'string': six.text_type,
+                    'array': lambda x: x}[unknown['type']](unknown['value'])
 
         def get_unknown_meta(unknown):
             ret = {'pass_by_obj': True}
