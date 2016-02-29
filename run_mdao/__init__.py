@@ -1,16 +1,11 @@
 from __future__ import print_function
 from __future__ import absolute_import
-import sys
 import os
 import os.path
 import io
 import json
-import subprocess
 import importlib
 import time
-import tempfile
-import socket
-import zipfile
 import contextlib
 import numpy
 import six
@@ -22,12 +17,17 @@ from run_mdao.restart_recorder import RestartRecorder
 
 # from openmdao.api import IndepVarComp, Component, Problem, Group
 from openmdao.core.problem import Problem
-from openmdao.core.component import Component
 from openmdao.core.group import Group
 from openmdao.components.indep_var_comp import IndepVarComp
 from openmdao.api import ScipyOptimizer
 
 from openmdao.core.mpi_wrap import MPI
+
+from run_mdao.testbenchcomponent import TestBenchComponent, _get_param_name
+from run_mdao.parallel_execution import par_clone_and_config
+
+
+__all__ = ['run', 'run_one', 'with_problem']
 
 
 def CouchDBRecorder(*args, **kwargs):
@@ -79,151 +79,8 @@ def _memoize_solve(component, fn):
     return solve_nonlinear
 
 
-def _get_param_name(param_name, component_type=None):
-    """OpenMDAO won't let us have a parameter and output of the same name..."""
-    if component_type is not None and component_type not in ('IndepVarComp', 'TestBenchComponent', 'EnumMap'):
-        return param_name
-    return 'param_{}'.format(param_name)
-
-
-class TestBenchComponent(Component):
-    def __init__(self, name, mdao_config, root):
-        super(TestBenchComponent, self).__init__()
-        self.name = name
-        self.mdao_config = mdao_config
-        self.directory = mdao_config['components'][name]['details']['directory']
-        self.original_testbench_manifest = self._read_testbench_manifest()
-        for metric in self.original_testbench_manifest.get('Metrics', ()):
-            metric['Value'] = None
-
-        self.fd_options['force_fd'] = True
-
-        def get_meta(param):
-            units = param.get('units')
-            if units:
-                return {'units': str(units)}
-            else:
-                return {}
-        for param_name, param in six.iteritems(mdao_config['components'][name].get('parameters', {})):
-            pass_by_obj = source_is_not_driver = param.get('source', [''])[0] not in mdao_config['drivers']
-            val = 0.0
-            if source_is_not_driver and 'source' in param:
-                source_component = {c.name: c for c in root.components()}[param['source'][0]]
-                val = source_component._init_unknowns_dict[param['source'][-1]]['val']
-                pass_by_obj = source_component._init_unknowns_dict[param['source'][-1]].get('pass_by_obj', False)
-            elif 'source' in param:
-                if mdao_config['drivers'][param['source'][0]]['designVariables'][param['source'][-1]].get('type') == "enum":
-                    val = u''
-                    pass_by_obj = True
-
-            self.add_param(_get_param_name(param_name), val=val, pass_by_obj=pass_by_obj, **get_meta(param))
-
-        for metric_name, metric in six.iteritems(mdao_config['components'][name].get('unknowns', {})):
-            self.add_output(metric_name, val=0.0, pass_by_obj=True, **get_meta(metric))
-        self.add_output('_ret_code', val=0)
-
-    def _read_testbench_manifest(self):
-        with open(os.path.join(self.directory, 'testbench_manifest.json'), 'r') as testbench_manifest_json:
-            return json.loads(testbench_manifest_json.read())
-
-    def _write_testbench_manifest(self, testbench_manifest):
-        # print(repr(testbench_manifest))
-        output = json.dumps(testbench_manifest, indent=4)
-        with open(os.path.join(self.directory, 'testbench_manifest.json'), 'w') as testbench_manifest_json:
-            testbench_manifest_json.write(output)
-
-    def _run_testbench(self):
-        return subprocess.call([sys.executable, '-m', 'testbenchexecutor', 'testbench_manifest.json'], cwd=self.directory)
-
-    def solve_nonlinear(self, params, unknowns, resids):
-        # FIXME: without dict(), this returns wrong values. why?
-        for param_name, val in six.iteritems(dict(params)):
-            param_name = param_name[len(_get_param_name('')):]
-            for manifest_param in self.original_testbench_manifest['Parameters']:
-                if manifest_param['Name'] == param_name:
-                    # val = param_value['val']
-                    # if param_value.get('pass_by_obj', True):
-                    #     val = val.val
-                    if isinstance(val, numpy.ndarray):
-                        # manifest_param['Value'] = list((numpy.asscalar(v) for v in param_value['val']))
-                        if len(val) == 1:
-                            manifest_param['Value'] = val[0]  # FIXME seems we always get an ndarray from the DOE. Why?
-                        else:
-                            manifest_param['Value'] = val.tolist()
-                    else:
-                        # manifest_param['Value'] = numpy.asscalar(param_value['val'].val)
-                        manifest_param['Value'] = val
-                    break
-            else:
-                raise Exception('Could not find parameter "{}" in {}/testbench_manifest.json'.format(param_name, self.directory))
-
-        self._write_testbench_manifest(self.original_testbench_manifest)
-
-        self.ret_code = unknowns['_ret_code'] = self._run_testbench()
-
-        testbench_manifest = self._read_testbench_manifest()
-
-        for metric_name in self.mdao_config['components'][self.name].get('unknowns', {}):
-            if self.ret_code != 0:
-                unknowns[metric_name] = None
-            for testbench_metric in testbench_manifest['Metrics']:
-                if metric_name == testbench_metric['Name']:
-                    value = testbench_metric['Value']
-                    if isinstance(value, list):
-                        unknowns[metric_name] = numpy.array(value)
-                    else:
-                        unknowns[metric_name] = value
-                    break
-            else:
-                raise ValueError('Could not find metric "{}" in {}/testbench_manifest.json'.format(metric_name, self.directory))
-
-    def jacobian(self, params, unknowns, resids):
-        raise Exception('unsupported')
-
-
-def par_clone_and_config(filename):
-    wdir = tempfile.mkdtemp(prefix='mdao-')
-    comm = MPI.COMM_WORLD
-    rank = comm.Get_rank()
-
-    # Distributing the config from root node to every worker
-    if rank == 0:
-        with open(filename, 'r') as mdao_config_json:
-            mdao_config = json.loads(mdao_config_json.read())
-        # Extra info if SFTP/SCP is used to pull from root
-        root_ip = socket.gethostbyname(socket.gethostname())
-        root_dir = os.path.dirname(os.path.abspath(filename))
-        mdao_config['mpi'] = {'root_ip': root_ip, 'root_dir': root_dir}
-    else:
-        mdao_config = None
-    mdao_config = comm.bcast(mdao_config, root=0)
-
-    # Distributing all artifacts (via MPI, for now)
-    if rank == 0:
-        zbuff = six.BytesIO()
-        with zipfile.ZipFile(zbuff, 'w') as zf:
-            # this might be too fancy, we can zip everyhting in 'root_dir'
-            for component in six.itervalues(mdao_config['components']):
-                try:
-                    component_dir = component['details']['directory']
-                except KeyError:
-                    continue
-                for root, dirs, files in os.walk(component_dir):
-                    for file in files:
-                        zf.write(os.path.join(root, file))
-    else:
-        zbuff = None
-    zbuff = comm.bcast(zbuff, root=0)
-
-    # Extracting all artifacts and cd to the work dir
-    os.chdir(wdir)
-    with zipfile.ZipFile(zbuff, 'r') as zf:
-        zf.extractall()
-
-    return mdao_config
-
-
 def run_one(filename, input):
+    """Runs one iteration with specified inputs."""
     original_dir = os.path.dirname(os.path.abspath(filename))
 
     class OneInputDriver(PredeterminedRunsDriver):
@@ -277,6 +134,7 @@ def instantiate_component(component, component_name, mdao_config, root):
 
 
 def run(filename, override_driver=None):
+    """Runs OpenMDAO on an mdao_config."""
     original_dir = os.path.dirname(os.path.abspath(filename))
     if MPI:
         mdao_config = par_clone_and_config(filename)
