@@ -209,6 +209,11 @@ def with_problem(mdao_config, original_dir, override_driver=None):
                 recorder.options['record_unknowns'] = True
                 recorder.options['record_resids'] = False
                 recorder.options['includes'] = list(unknowns_map.keys())
+            else:
+                mod_name = '.'.join(recorder['type'].split('.')[:-1])
+                class_name = recorder['type'].split('.')[-1]
+                recorder = getattr(importlib.import_module(mod_name), class_name)()
+
             top.driver.add_recorder(recorder)
         return recorders
 
