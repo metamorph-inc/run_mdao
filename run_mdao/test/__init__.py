@@ -29,7 +29,7 @@ def main():
         for input_filename in glob.glob(_this_dir + '/mdao_config*json'):
             output_filename = input_filename + '.output.csv'
             with run_regression(output_filename):
-                    run_mdao.run(input_filename)
+                run_mdao.run(input_filename)
     finally:
         for tb_json_name, contents in tb_jsons:
             with open(tb_json_name, 'w') as tb_json:

@@ -6,6 +6,7 @@ import os.path
 import sys
 import json
 import subprocess
+import contextlib
 import six
 import numpy
 from openmdao.core.component import Component
@@ -23,7 +24,7 @@ class TestBenchComponent(Component):
         super(TestBenchComponent, self).__init__()
         self.name = name
         self.mdao_config = mdao_config
-        self.directory = mdao_config['components'][name]['details']['directory']
+        self.__directory = mdao_config['components'][name]['details']['directory']
         self.original_testbench_manifest = self._read_testbench_manifest()
         for metric in self.original_testbench_manifest.get('Metrics', ()):
             metric['Value'] = None
@@ -47,6 +48,10 @@ class TestBenchComponent(Component):
                 if mdao_config['drivers'][param['source'][0]]['designVariables'][param['source'][-1]].get('type') == "enum":
                     val = u''
                     pass_by_obj = True
+            else:
+                with self._get_tb_param(param_name) as manifest_param:
+                    val = manifest_param['Value']
+                    pass_by_obj = True
 
             self.add_param(_get_param_name(param_name), val=val, pass_by_obj=pass_by_obj, **get_meta(param))
 
@@ -55,39 +60,45 @@ class TestBenchComponent(Component):
         self.add_output('_ret_code', val=0)
 
     def _read_testbench_manifest(self):
-        with open(os.path.join(self.directory, 'testbench_manifest.json'), 'r') as testbench_manifest_json:
+        with open(os.path.join(self.__directory, 'testbench_manifest.json'), 'r') as testbench_manifest_json:
             return json.loads(testbench_manifest_json.read())
 
     def _write_testbench_manifest(self, testbench_manifest):
         # print(repr(testbench_manifest))
         output = json.dumps(testbench_manifest, indent=4)
-        with open(os.path.join(self.directory, 'testbench_manifest.json'), 'w') as testbench_manifest_json:
+        with open(os.path.join(self.__directory, 'testbench_manifest.json'), 'w') as testbench_manifest_json:
             testbench_manifest_json.write(output)
 
+    @contextlib.contextmanager
+    def _get_tb_param(self, param_name):
+        for manifest_param in self.original_testbench_manifest['Parameters']:
+            if manifest_param['Name'] == param_name:
+                yield manifest_param
+                break
+        else:
+            raise Exception('Could not find parameter "{}" in {}/testbench_manifest.json'.format(param_name, self.__directory))
+
+
     def _run_testbench(self):
-        return subprocess.call([sys.executable, '-m', 'testbenchexecutor', 'testbench_manifest.json'], cwd=self.directory)
+        return subprocess.call([sys.executable, '-m', 'testbenchexecutor', 'testbench_manifest.json'], cwd=self.__directory)
 
     def solve_nonlinear(self, params, unknowns, resids):
         # FIXME: without dict(), this returns wrong values. why?
         for param_name, val in six.iteritems(dict(params)):
             param_name = param_name[len(_get_param_name('')):]
-            for manifest_param in self.original_testbench_manifest['Parameters']:
-                if manifest_param['Name'] == param_name:
-                    # val = param_value['val']
-                    # if param_value.get('pass_by_obj', True):
-                    #     val = val.val
-                    if isinstance(val, numpy.ndarray):
-                        # manifest_param['Value'] = list((numpy.asscalar(v) for v in param_value['val']))
-                        if len(val) == 1:
-                            manifest_param['Value'] = val[0]  # FIXME seems we always get an ndarray from the DOE. Why?
-                        else:
-                            manifest_param['Value'] = val.tolist()
+            with self._get_tb_param(param_name) as manifest_param:
+                # val = param_value['val']
+                # if param_value.get('pass_by_obj', True):
+                #     val = val.val
+                if isinstance(val, numpy.ndarray):
+                    # manifest_param['Value'] = list((numpy.asscalar(v) for v in param_value['val']))
+                    if len(val) == 1:
+                        manifest_param['Value'] = val[0]  # FIXME seems we always get an ndarray from the DOE. Why?
                     else:
-                        # manifest_param['Value'] = numpy.asscalar(param_value['val'].val)
-                        manifest_param['Value'] = val
-                    break
-            else:
-                raise Exception('Could not find parameter "{}" in {}/testbench_manifest.json'.format(param_name, self.directory))
+                        manifest_param['Value'] = val.tolist()
+                else:
+                    # manifest_param['Value'] = numpy.asscalar(param_value['val'].val)
+                    manifest_param['Value'] = val
 
         self._write_testbench_manifest(self.original_testbench_manifest)
 
@@ -107,7 +118,7 @@ class TestBenchComponent(Component):
                         unknowns[metric_name] = value
                     break
             else:
-                raise ValueError('Could not find metric "{}" in {}/testbench_manifest.json'.format(metric_name, self.directory))
+                raise ValueError('Could not find metric "{}" in {}/testbench_manifest.json'.format(metric_name, self.__directory))
 
     def jacobian(self, params, unknowns, resids):
         raise Exception('unsupported')
