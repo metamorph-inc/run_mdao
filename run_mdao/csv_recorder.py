@@ -34,7 +34,7 @@ class CsvRecorder(BaseRecorder):
 
         def munge(val):
             if isinstance(val, numpy.ndarray):
-                return ",".join(map(str, val))
+                return str(val.tolist())
             return str(val)
         self.writer.writerow([munge(params[param_name]) for param_name in self.param_names] + [munge(unknowns[unknown_name]) for unknown_name in self.unknown_names])
 
@@ -72,7 +72,7 @@ class MappingCsvRecorder(BaseRecorder):
 
         def munge(val):
             if isinstance(val, numpy.ndarray):
-                return ",".join(map(str, val))
+                return str(val.tolist())
             return str(val)
 
         def do_mapping(map_, values):
