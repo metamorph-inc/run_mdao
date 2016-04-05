@@ -154,7 +154,7 @@ def with_problem(mdao_config, original_dir, override_driver=None):
     root = top.root = Group()
     recorder = None
     driver_params = {'original_dir': original_dir}
-    eval(compile(driver['details']['Code'], '<driver Code>', 'exec'), globals(), driver_params)
+    eval(compile(driver['details'].get('Code', ''), '<driver Code>', 'exec'), globals(), driver_params)
 
     def get_desvar_path(designVariable):
         return 'designVariable.{}'.format(designVariable)
@@ -176,10 +176,12 @@ def with_problem(mdao_config, original_dir, override_driver=None):
             top.driver = driver_type(**driver_params)
         else:
             top.driver = override_driver
-
-        # top.driver.options[''] = ...
+    elif driver['type'] == 'PCCDriver':
+        import PCC.pcc_driver
+        driver_params.update(driver['details'])
+        top.driver = PCC.pcc_driver.PCCdriver(**driver_params)
     else:
-        raise Exception('Driver "{}" is unsupported'.format(driver['type']))
+        raise ValueError('Unsupported driver type %s' % driver['type'])
 
     def add_recorders():
         recorders = []
