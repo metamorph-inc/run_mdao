@@ -30,13 +30,17 @@ def main():
             output_filename = input_filename + '.output.csv'
             with run_regression(output_filename):
                 run_mdao.run(input_filename)
+
+        with run_regression(os.path.join(_this_dir, 'single_run.csv')):
+            run_mdao.run_one('mdao_config_constant.json', (('designVariable.Naca_Code', 4040), ))
+
+        with run_regression(os.path.join(_this_dir, 'run_failure.csv')):
+            run_mdao.run_one('mdao_config_basic_CyPhy.json', (('designVariable.y', 0), ('designVariable.x', 'Ia') ))
+
     finally:
         for tb_json_name, contents in tb_jsons:
             with open(tb_json_name, 'w') as tb_json:
                 tb_json.write(contents)
-
-    with run_regression(os.path.join(_this_dir, 'single_run.csv')):
-        run_mdao.run_one('mdao_config_constant.json', (('designVariable.Naca_Code', 4040), ))
 
 if __name__ == '__main__':
     main()

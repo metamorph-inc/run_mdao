@@ -9,7 +9,7 @@ import subprocess
 import contextlib
 import six
 import numpy
-from openmdao.core.component import Component
+from openmdao.api import AnalysisError, Component
 
 
 def _get_param_name(param_name, component_type=None):
@@ -26,8 +26,6 @@ class TestBenchComponent(Component):
         self.mdao_config = mdao_config
         self.__directory = mdao_config['components'][name]['details']['directory']
         self.original_testbench_manifest = self._read_testbench_manifest()
-        for metric in self.original_testbench_manifest.get('Metrics', ()):
-            metric['Value'] = None
 
         self.fd_options['force_fd'] = True
 
@@ -57,7 +55,7 @@ class TestBenchComponent(Component):
 
         for metric_name, metric in six.iteritems(mdao_config['components'][name].get('unknowns', {})):
             self.add_output(metric_name, val=0.0, pass_by_obj=True, **get_meta(metric))
-        self.add_output('_ret_code', val=0)
+        self.add_output('_ret_code', val=0, pass_by_obj=True)
 
     def _read_testbench_manifest(self):
         with open(os.path.join(self.__directory, 'testbench_manifest.json'), 'r') as testbench_manifest_json:
@@ -103,12 +101,12 @@ class TestBenchComponent(Component):
         self._write_testbench_manifest(self.original_testbench_manifest)
 
         self.ret_code = unknowns['_ret_code'] = self._run_testbench()
+        if self.ret_code != 0:
+            raise AnalysisError('testbenchexecutor failed with exit code {}'.format(self.ret_code))
 
         testbench_manifest = self._read_testbench_manifest()
 
         for metric_name in self.mdao_config['components'][self.name].get('unknowns', {}):
-            if self.ret_code != 0:
-                unknowns[metric_name] = None
             for testbench_metric in testbench_manifest['Metrics']:
                 if metric_name == testbench_metric['Name']:
                     value = testbench_metric['Value']

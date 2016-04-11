@@ -2,6 +2,7 @@ from __future__ import print_function
 from __future__ import absolute_import
 import numpy
 import itertools
+import traceback
 
 from run_mdao.restart_recorder import RestartRecorder
 
@@ -9,6 +10,7 @@ from openmdao.util.array_util import evenly_distrib_idxs
 from openmdao.util.record_util import create_local_meta, update_local_meta
 
 from openmdao.core.mpi_wrap import MPI, debug
+from openmdao.api import AnalysisError
 import openmdao.api
 
 import random
@@ -64,7 +66,12 @@ class PredeterminedRunsDriver(openmdao.api.PredeterminedRunsDriver):
         metadata = create_local_meta(None, 'Driver')
 
         update_local_meta(metadata, (self.iter_count,))
-        problem.root.solve_nonlinear(metadata=metadata)
+
+        try:
+            problem.root.solve_nonlinear(metadata=metadata)
+        except AnalysisError:
+            metadata['msg'] = traceback.format_exc()
+            metadata['success'] = 0
         self.recorders.record_iteration(problem.root, metadata)
         self.iter_count += 1
         if self.use_restart:
