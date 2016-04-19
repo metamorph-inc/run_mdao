@@ -227,7 +227,7 @@ def with_problem(mdao_config, original_dir, override_driver=None):
             if var.get('type', 'double') == 'double':
                 driver_vars.append((var_name, 0.0))
             elif var['type'] == 'enum':
-                driver_vars.append((var_name, u'', {"pass_by_obj": True}))
+                driver_vars.append((var_name, var['items'][0], {"pass_by_obj": True}))
             elif var['type'] == 'int':
                 driver_vars.append((var_name, 0))
             else:
