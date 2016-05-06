@@ -9,7 +9,8 @@ import subprocess
 import contextlib
 import six
 import numpy
-from openmdao.api import AnalysisError, Component
+from run_mdao.drivers import AnalysisError
+from openmdao.api import Component
 
 
 def _get_param_name(param_name, component_type=None):
