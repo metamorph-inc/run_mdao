@@ -58,7 +58,12 @@ class TestBenchComponent(Component):
             self.add_param(_get_param_name(param_name), val=val, pass_by_obj=pass_by_obj, **get_meta(param))
 
         for metric_name, metric in six.iteritems(mdao_config['components'][name].get('unknowns', {})):
-            self.add_output(metric_name, val=0.0, pass_by_obj=True, **get_meta(metric))
+            pass_by_obj = True
+            for driver in mdao_config['drivers'].values():
+                for objective in driver['objectives'].values():
+                    if objective['source'][0] == name and objective['source'][1] == metric_name:
+                        pass_by_obj = False
+            self.add_output(metric_name, val=0.0, pass_by_obj=pass_by_obj, **get_meta(metric))
         self.add_output('_ret_code', val=0, pass_by_obj=True)
 
     def _read_testbench_manifest(self):
@@ -79,7 +84,6 @@ class TestBenchComponent(Component):
                 break
         else:
             raise Exception('Could not find parameter "{}" in {}/testbench_manifest.json'.format(param_name, self.__directory))
-
 
     def _run_testbench(self):
         return subprocess.call([sys.executable, '-m', 'testbenchexecutor', 'testbench_manifest.json'], cwd=self.__directory)
