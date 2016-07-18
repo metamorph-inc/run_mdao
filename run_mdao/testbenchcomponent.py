@@ -86,7 +86,7 @@ class TestBenchComponent(Component):
             raise Exception('Could not find parameter "{}" in {}/testbench_manifest.json'.format(param_name, self.__directory))
 
     def _run_testbench(self):
-        return subprocess.call([sys.executable, '-m', 'testbenchexecutor', 'testbench_manifest.json'], cwd=self.__directory)
+        return subprocess.call([sys.executable, '-m', 'testbenchexecutor', '--detailed-errors', 'testbench_manifest.json'], cwd=self.__directory)
 
     def solve_nonlinear(self, params, unknowns, resids):
         # FIXME: without dict(), this returns wrong values. why?

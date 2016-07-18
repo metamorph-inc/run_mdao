@@ -4,11 +4,13 @@
 
 
 Repos:  
-https://github.com/metamorph-inc/OpenMDAO parallel_doe  
-https://github.com/metamorph-inc/run_mdao master  
-https://github.com/metamorph-inc/testbenchexecutor master  
-https://bitbucket.org/metamorphsoftwareinc/openmdao-couchdb-recorder master  
-
+https://github.com/metamorph-inc/OpenMDAO  
+https://github.com/metamorph-inc/run_mdao  
+https://github.com/metamorph-inc/testbenchexecutor  
+https://bitbucket.org/metamorphsoftwareinc/openmdao-couchdb-recorder  
+https://github.com/metamorph-inc/fmu_wrapper  
+ .\venv\scripts\nosetests fmu_wrapper.test  
+https://github.com/metamorph-inc/excel_wrapper  
 
 ##### On all nodes:
 
