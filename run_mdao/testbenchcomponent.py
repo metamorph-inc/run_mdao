@@ -121,8 +121,6 @@ class TestBenchComponent(Component):
                     if isinstance(value, list):
                         unknowns[metric_name] = numpy.array(value)
                     else:
-                        if self._init_unknowns_dict[metric_name].get('pass_by_obj', False):
-                            value = float(value)
                         unknowns[metric_name] = value
                     break
             else:
