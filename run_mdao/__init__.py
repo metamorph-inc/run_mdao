@@ -88,7 +88,7 @@ def run_one(filename, input):
         def _deserialize_or_create_runlist(self):
             return [input]
 
-    run(filename, override_driver=OneInputDriver())
+    return run(filename, override_driver=OneInputDriver())
 
 
 def instantiate_component(component, component_name, mdao_config, root):
@@ -140,6 +140,7 @@ def run(filename, override_driver=None):
             mdao_config = json.loads(mdao_config_json.read())
     with with_problem(mdao_config, original_dir, override_driver) as top:
         top.run()
+        return top
 
 
 @contextlib.contextmanager
