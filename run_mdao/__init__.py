@@ -216,7 +216,7 @@ def with_problem(mdao_config, original_dir, override_driver=None):
                 mode = 'wb'
                 if RestartRecorder.is_restartable(original_dir):
                     mode = 'ab'
-                recorder = MappingCsvRecorder({}, unknowns_map, io.open(recorder['filename'], mode))
+                recorder = MappingCsvRecorder({}, unknowns_map, io.open(recorder['filename'], mode), include_id=recorder.get('include_id', False))
                 if mode == 'ab':
                     recorder._wrote_header = True
             elif recorder['type'] == 'AllCsvRecorder':
