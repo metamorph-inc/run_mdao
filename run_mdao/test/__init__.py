@@ -9,6 +9,7 @@ import shutil
 import subprocess
 import unittest
 import contextlib
+import csv
 
 _this_dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -47,6 +48,16 @@ class RegressionTest(unittest.TestCase):
         with run_regression(os.path.join(_this_dir, 'run_failure.csv')):
             run_mdao.run_one('mdao_config_basic_CyPhy.json', (('designVariable.y', 0), ('designVariable.x', 'Ia')))
 
+    def test_mdao_config_artifacts(self):
+        os.chdir(_this_dir)
+        run_mdao.run('mdao_config_artifacts.json')
+        with open('output.csv') as output:
+            csvreader = iter(csv.reader(output))
+            headers = next(csvreader)
+            for row in csvreader:
+                guid = row[headers.index('GUID')]
+                self.assertTrue(os.path.isfile(os.path.join('artifacts', guid, 'bin.out')))
+
 for input_filename in glob.glob(_this_dir + '/mdao_config*json'):
     output_filename = input_filename + '.output.csv'
 
@@ -55,8 +66,9 @@ for input_filename in glob.glob(_this_dir + '/mdao_config*json'):
             self._test_mdao_config(input_filename, output_filename)
 
         name = 'test_' + os.path.splitext(os.path.basename(input_filename))[0]
-        test.__name__ = name
-        setattr(RegressionTest, name, test)
+        if getattr(RegressionTest, name, None) is None:
+            test.__name__ = name
+            setattr(RegressionTest, name, test)
 
     _add_test(input_filename, output_filename)
 
