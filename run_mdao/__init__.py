@@ -8,6 +8,7 @@ import json
 import importlib
 import time
 import contextlib
+import itertools
 import numpy
 import six
 
@@ -16,7 +17,7 @@ from run_mdao.enum_mapper import EnumMapper
 from run_mdao.drivers import FullFactorialDriver, UniformDriver, LatinHypercubeDriver, OptimizedLatinHypercubeDriver, PredeterminedRunsDriver
 from run_mdao.restart_recorder import RestartRecorder
 
-from openmdao.api import IndepVarComp, Problem, Group, ScipyOptimizer
+from openmdao.api import IndepVarComp, Problem, Group, ScipyOptimizer, FileRef
 
 from openmdao.core.mpi_wrap import MPI
 
@@ -51,6 +52,9 @@ def _memoize_solve(component, fn):
     from run_mdao.array_hashable import array_hashable
     memo = {}
     component.add_output('_runtime', val=0.0)
+    # don't attempt to memoize components with FileRefs
+    if [v for v in itertools.chain(component._init_unknowns_dict.values(), component._init_params_dict.values()) if isinstance(v['val'], FileRef)]:
+        return fn
 
     def solve_nonlinear(tb_params, unknowns, resids):
         # FIXME: without dict(), this returns wrong values. why?
