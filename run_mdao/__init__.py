@@ -138,23 +138,44 @@ def instantiate_component(component, component_name, mdao_config, root):
 def run(filename, override_driver=None, profile_execution=False):
     """Run OpenMDAO on an mdao_config."""
     original_dir = os.path.dirname(os.path.abspath(filename))
-    if MPI:
-        mdao_config = par_clone_and_config(filename)
-    else:
-        with open(filename, 'r') as mdao_config_json:
-            mdao_config = json.loads(mdao_config_json.read())
-    with with_problem(mdao_config, original_dir, override_driver) as top:
+    try:
         if profile_execution:
-            profile.setup(top)
-            profile.start()
-        top.run()
-        if profile_execution:
-            profile.stop()
-        return top
+            profile_csv = create_profile_csv()
+        else:
+            profile_csv = None
+
+        if MPI:
+            mdao_config = par_clone_and_config(filename)
+        else:
+            with open(filename, 'r') as mdao_config_json:
+                mdao_config = json.loads(mdao_config_json.read())
+        with with_problem(mdao_config, original_dir, override_driver, profile_csv) as top:
+            if profile_execution:
+                profile.setup(top)
+                profile.start()
+            top.run()
+            if profile_execution:
+                profile.stop()
+            return top
+    finally:
+        if profile_csv is not None:
+            profile_csv.close()
+
+def create_profile_csv():
+    base_filename = "runmdao.profile"
+    extension = ".csv"
+    candidate_name = base_filename + extension
+    i = 0
+
+    while os.path.exists(candidate_name):
+        i += 1
+        candidate_name = base_filename + str(i) + extension
+
+    return open(candidate_name, "w")
 
 
 @contextlib.contextmanager
-def with_problem(mdao_config, original_dir, override_driver=None):
+def with_problem(mdao_config, original_dir, override_driver=None, profile_csv=None):
     # TODO: can we support more than one driver
     driver = next(iter(mdao_config['drivers'].values()))
 
@@ -317,7 +338,11 @@ def with_problem(mdao_config, original_dir, override_driver=None):
         tbs_sorted = get_sorted_components()
         for component_name in tbs_sorted:
             component = mdao_config['components'][component_name]
+            instantiate_start = time.time()
             mdao_component = instantiate_component(component, component_name, mdao_config, root)
+            instantiate_end = time.time()
+            if profile_csv is not None:
+                profile_csv.write("Instantiate.{0},{1}\n".format(component_name, instantiate_end - instantiate_start))
             root.add(component_name, mdao_component)
 
         for component_name, component in six.iteritems(mdao_config['components']):
@@ -352,7 +377,11 @@ def with_problem(mdao_config, original_dir, override_driver=None):
                 else:
                     pass  # TODO: No min or max provided with constraint; warn or fail here?
 
+        setup_start = time.time()
         top.setup()
+        setup_end = time.time()
+        if profile_csv is not None:
+            profile_csv.write("Setup,{0}\n".format(setup_end - setup_start))
         # from openmdao.devtools.debug import dump_meta
         # dump_meta(top.root)
         yield top
