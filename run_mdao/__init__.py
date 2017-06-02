@@ -17,7 +17,7 @@ from run_mdao.enum_mapper import EnumMapper
 from run_mdao.drivers import FullFactorialDriver, UniformDriver, LatinHypercubeDriver, OptimizedLatinHypercubeDriver, PredeterminedRunsDriver
 from run_mdao.restart_recorder import RestartRecorder
 
-from openmdao.api import IndepVarComp, Problem, Group, ScipyOptimizer, FileRef
+from openmdao.api import IndepVarComp, Problem, Group, ScipyOptimizer, FileRef, profile
 
 from openmdao.core.mpi_wrap import MPI
 
@@ -135,7 +135,7 @@ def instantiate_component(component, component_name, mdao_config, root):
         return component_instance
 
 
-def run(filename, override_driver=None):
+def run(filename, override_driver=None, profile_execution=False):
     """Run OpenMDAO on an mdao_config."""
     original_dir = os.path.dirname(os.path.abspath(filename))
     if MPI:
@@ -144,7 +144,12 @@ def run(filename, override_driver=None):
         with open(filename, 'r') as mdao_config_json:
             mdao_config = json.loads(mdao_config_json.read())
     with with_problem(mdao_config, original_dir, override_driver) as top:
+        if profile_execution:
+            profile.setup(top)
+            profile.start()
         top.run()
+        if profile_execution:
+            profile.stop()
         return top
 
 

@@ -7,10 +7,13 @@ import os.path
 import six
 import numpy
 
+import openmdao.util.profile
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Run a mdao_config.json using OpenMDAO')
     parser.add_argument('filename', nargs='?', default='mdao_config.json')
     parser.add_argument('--one-component', help='component name')
+    parser.add_argument('--profile', action='store_true', help='Enable OpenMDAO execution profiling')
 
     args = parser.parse_args()
 
@@ -38,4 +41,4 @@ if __name__ == '__main__':
             sys.stdout.write(json.dumps({name: serialize(val) for name, val in six.iteritems(unknowns)}))
 
     else:
-        run_mdao.run(args.filename)
+        run_mdao.run(args.filename, profile_execution=args.profile)
