@@ -9,11 +9,12 @@ from setuptools import setup
 
 setup(
     name='run_mdao',
-    version='0.1.9',
+    version='0.1.10',
     author='MetaMorph Software, Inc',
     author_email='ksmyth@metamorphsoftware.com',
     description='Runs a mdao_config.json with OpenMDAO',
     packages=['run_mdao', 'run_mdao.python_component', 'run_mdao.python_component.get_params_and_unknowns'],
+    install_requires=['openmdao', 'testbenchexecutor'],
     package_dir={'run_mdao': 'run_mdao'},
     entry_points={
         "console_scripts": [
