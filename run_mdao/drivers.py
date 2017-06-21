@@ -158,7 +158,8 @@ class UniformDriver(PredeterminedRunsDriver):
     def _build_runlist(self):
         def sample_var(metadata):
             if metadata.get('type', 'double') == 'double':
-                return self.random.uniform(metadata['lower'], metadata['upper'])
+                if metadata['lower'] == metadata['upper']:
+                    return metadata['lower']
             elif metadata.get('type') == 'enum':
                 return self.random.choice(metadata['items'])
             elif metadata.get('type') == 'int':
