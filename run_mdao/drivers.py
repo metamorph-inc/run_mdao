@@ -160,6 +160,7 @@ class UniformDriver(PredeterminedRunsDriver):
             if metadata.get('type', 'double') == 'double':
                 if metadata['lower'] == metadata['upper']:
                     return metadata['lower']
+                return self.random.uniform(metadata['lower'], metadata['upper'])
             elif metadata.get('type') == 'enum':
                 return self.random.choice(metadata['items'])
             elif metadata.get('type') == 'int':
