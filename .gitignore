@@ -1,3 +1,5 @@
+.coverage
+.noseids
 *.pyc
 *~
 run_mdao.egg-info
@@ -9,3 +11,12 @@ run_mdao/test/hosts
 /build/
 /dist/
 /venv/
+/htmlcov/
+run_mdao/test/TestBench2_Files/FileInput1.ext
+run_mdao/test/TestBench2_Files/FileOutput1.ext
+run_mdao/test/TestBench2_Files/log/
+run_mdao/test/time.txt
+# these tests aren't repeatable
+run_mdao/test/mdao_config_driverless_hierarchy.json.output.csv
+run_mdao/test/mdao_config_simple_subproblem.json.output.csv
+run_mdao/test/mdao_config_subproblem_three_levels.json.output.csv
