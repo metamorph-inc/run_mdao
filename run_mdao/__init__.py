@@ -348,7 +348,25 @@ def with_problem(mdao_config, original_dir, override_driver=None, is_subproblem=
                 if source[0] in mdao_config['drivers']:
                     # TODO: If it's legal for this desvar to also point to a ProblemInput,
                     # we need to create a PassThroughComponent just like above
-                    path = get_desvar_path(source[1])
+                    this_driver = mdao_config['drivers'][source[0]]
+
+                    if source[1] in this_driver.get('designVariables', {}):
+                        path = get_desvar_path(source[1])
+                    else: # Source is an objective, ivar, or constraint; need to get the actual source
+                        if source[1] in this_driver.get('objectives', {}):
+                            driver_output_type = 'objectives'
+                        elif source[1] in this_driver.get('constraints', {}):
+                            driver_output_type = 'constraints'
+                        elif source[1] in this_driver.get('intermediateVariables', {}):
+                            driver_output_type = 'intermediateVariables'
+                        else:
+                            raise ValueError('Driver output "{}"" not found'.format(source[1]))
+                        real_source = this_driver[driver_output_type][source[1]]['source']
+                        if real_source[0] in mdao_config['subProblems']:
+                            unknown_name = subProblemOutputMeta[real_source[0]][real_source[1]]
+                            path = '{}.{}'.format(real_source[0], unknown_name)
+                        else:
+                            path = '{}.{}'.format(real_source[0], real_source[1])
                 elif source[0] in mdao_config['subProblems']:
                     unknown_name = subProblemOutputMeta[source[0]][source[1]]
                     path = '{}.{}'.format(source[0], unknown_name)
