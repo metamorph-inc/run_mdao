@@ -29,7 +29,7 @@ class RegressionTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         tb_json_names = glob.glob(os.path.join(_this_dir, '*/testbench_manifest.json'))
-        cls.tb_jsons = [(tb_json_name, open(tb_json_name, 'r').read()) for tb_json_name in tb_json_names]
+        cls.tb_jsons = [(tb_json_name, open(tb_json_name, 'rb').read()) for tb_json_name in tb_json_names]
         artifacts_dir = os.path.join(_this_dir, 'artifacts')
         if os.path.exists(artifacts_dir):
             shutil.rmtree(artifacts_dir)
