@@ -20,3 +20,4 @@ run_mdao/test/time.txt
 run_mdao/test/mdao_config_driverless_hierarchy.json.output.csv
 run_mdao/test/mdao_config_simple_subproblem.json.output.csv
 run_mdao/test/mdao_config_subproblem_three_levels.json.output.csv
+run_mdao/test/mdao_config_subproblem_output_connected_to_objective.json.output.csv
