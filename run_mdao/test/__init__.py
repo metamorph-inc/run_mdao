@@ -37,7 +37,7 @@ class RegressionTest(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         for tb_json_name, contents in cls.tb_jsons:
-            with open(tb_json_name, 'w') as tb_json:
+            with open(tb_json_name, 'wb') as tb_json:
                 tb_json.write(contents)
 
     def _test_mdao_config(self, input_filename, output_filename):
