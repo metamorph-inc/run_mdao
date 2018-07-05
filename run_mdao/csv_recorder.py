@@ -41,6 +41,12 @@ class CsvRecorder(BaseRecorder):
         def munge(val):
             if isinstance(val, numpy.ndarray):
                 return str(val.tolist())
+            if isinstance(val, FileRef):
+                return None
+            if isinstance(val, six.text_type):
+                return val
+            if isinstance(val, float):
+                return repr(val)
             return str(val)
         self.writer.writerow([munge(params[param_name]) for param_name in self.param_names] + [munge(unknowns[unknown_name]) for unknown_name in self.unknown_names])
 
@@ -91,8 +97,10 @@ class MappingCsvRecorder(BaseRecorder):
                 return str(val.tolist())
             if isinstance(val, FileRef):
                 return None
-            if isinstance(val, unicode):
-                return val.encode('utf8')
+            if isinstance(val, six.text_type):
+                return val
+            if isinstance(val, float):
+                return repr(val)
             return str(val)
 
         def do_mapping(map_, values):
