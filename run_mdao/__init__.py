@@ -500,16 +500,26 @@ def with_problem(mdao_config, original_dir, override_driver=None, additional_rec
 
         for recorder in mdao_config.get('recorders', [{'type': 'DriverCsvRecorder', 'filename': 'output.csv'}]):
             if recorder['type'] == 'DriverCsvRecorder':
-                mode = 'wb'
+                mode = 'w'
                 exists = os.path.isfile(recorder['filename'])
                 if RestartRecorder.is_restartable(original_dir) or append_csv:
-                    mode = 'ab'
-                recorder = MappingCsvRecorder({}, unknowns_map, io.open(recorder['filename'], mode), include_id=recorder.get('include_id', False))
+                    mode = 'a'
+                if six.PY2:
+                    mode += 'b'
+                    open_kwargs = {}
+                else:
+                    open_kwargs = {'newline': ''}
+                recorder = MappingCsvRecorder({}, unknowns_map, io.open(recorder['filename'], mode, **open_kwargs), include_id=recorder.get('include_id', False))
                 if (append_csv and exists) or mode == 'ab':
                     recorder._wrote_header = True
             elif recorder['type'] == 'AllCsvRecorder':
-                mode = 'wb'
-                recorder = CsvRecorder(out=open(recorder['filename'], mode))
+                mode = 'w'
+                if six.PY2:
+                    mode += 'b'
+                    open_kwargs = {}
+                else:
+                    open_kwargs = {'newline': ''}
+                recorder = CsvRecorder(out=io.open(recorder['filename'], mode, **open_kwargs))
             elif recorder['type'] == 'CouchDBRecorder':
                 recorder = CouchDBRecorder(recorder.get('url', 'http://localhost:5984/'), recorder['run_id'])
                 recorder.options['record_params'] = True

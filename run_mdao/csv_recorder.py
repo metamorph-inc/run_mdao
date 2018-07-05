@@ -83,14 +83,14 @@ class MappingCsvRecorder(BaseRecorder):
         if self._wrote_header is False:
             id = []
             if self._include_id:
-                id = ['GUID']
-            self.writer.writerow(id + list(self.params_map.values()) +
-                [h for k, v in six.iteritems(self.unknowns_map) if (isinstance(unknowns[k], FileRef) is False) for h in v])
+                id = [u'GUID']
+            self.writer.writerow([six.text_type(s) for s in id + list(self.params_map.values()) +
+                [h for k, v in six.iteritems(self.unknowns_map) if (isinstance(unknowns[k], FileRef) is False) for h in v]])
             self._wrote_header = True
 
         id = []
         if self._include_id:
-            id = [uuid.uuid4()]
+            id = [str(uuid.uuid4())]
 
         def munge(val):
             if isinstance(val, numpy.ndarray):
@@ -108,7 +108,8 @@ class MappingCsvRecorder(BaseRecorder):
 
         def do_multimapping(map_, values):
             return [v for v in (munge(values[key]) for key, v in six.iteritems(map_) for _ in v) if v is not None]
-        self.writer.writerow(id + do_mapping(self.params_map, params) + do_multimapping(self.unknowns_map, unknowns))
+        row = id + do_mapping(self.params_map, params) + do_multimapping(self.unknowns_map, unknowns)
+        self.writer.writerow(row)
 
         if self._include_id:
             # write FileRefs to artifacts/GUID/mapped_name
