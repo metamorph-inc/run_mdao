@@ -69,7 +69,7 @@ class RegressionTest(unittest.TestCase):
                 writer = csv.writer(csv_desvar_file)
                 reader = csv.reader(csv_input_file)
                 for row in reader:
-                    writer.writerow(map(type(''), row[0:2]))
+                    writer.writerow(map(type(''), row[1:3]))
         with run_regression(os.path.join(_this_dir, 'run_csv.csv')):
             driver = run_mdao.drivers.CsvDriver(_this_dir, 'run_csv_input.csv')
             run_mdao.run('mdao_config_basic_CyPhy.json', override_driver=driver)

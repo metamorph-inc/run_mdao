@@ -1,1 +1,3 @@
 /run_mdao/test/*.json.output.csv text
+/run_mdao/test/single_run.csv text
+/run_mdao/test/run_csv.csv text
