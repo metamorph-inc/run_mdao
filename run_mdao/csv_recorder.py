@@ -84,7 +84,7 @@ class MappingCsvRecorder(BaseRecorder):
             id = []
             if self._include_id:
                 id = [u'GUID']
-            self.writer.writerow([six.text_type(s) for s in id + list(self.params_map.values()) +
+            self.writer.writerow([six.text_type(s) for s in id + ["AnalysisError"] + list(self.params_map.values()) +
                 [h for k, v in six.iteritems(self.unknowns_map) if (isinstance(unknowns[k], FileRef) is False) for h in v]])
             self._wrote_header = True
 
@@ -108,7 +108,12 @@ class MappingCsvRecorder(BaseRecorder):
 
         def do_multimapping(map_, values):
             return [v for v in (munge(values[key]) for key, v in six.iteritems(map_) for _ in v) if v is not None]
-        row = id + do_mapping(self.params_map, params) + do_multimapping(self.unknowns_map, unknowns)
+
+        analysisErrorOccurred = False
+        if metadata["success"] == 0:
+            analysisErrorOccurred = True
+
+        row = id + [analysisErrorOccurred] + do_mapping(self.params_map, params) + do_multimapping(self.unknowns_map, unknowns)
         self.writer.writerow(row)
 
         if self._include_id:
