@@ -14,7 +14,7 @@ setup(
     author_email='ksmyth@metamorphsoftware.com',
     description='Runs a mdao_config.json with OpenMDAO',
     packages=['run_mdao', 'run_mdao.python_component', 'run_mdao.python_component.get_params_and_unknowns'],
-    install_requires=['openmdao', 'testbenchexecutor'],
+    install_requires=['openmdao>=1.7,<2', 'testbenchexecutor'],
     package_dir={'run_mdao': 'run_mdao'},
     entry_points={
         "console_scripts": [
