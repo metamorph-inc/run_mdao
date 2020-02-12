@@ -121,17 +121,23 @@ class MappingCsvRecorder(BaseRecorder):
             for name, fileref in ((n, fr) for n, fr in six.iteritems(dict(unknowns)) if isinstance(fr, FileRef)):
                 mapped_names = self.unknowns_map.get(name, [])
                 for mapped_name in mapped_names:
-                    with fileref.open('rb') as artifact:
-                        directory = os.path.join(self.artifacts_directory, six.text_type(id[0]))
-                        try:
-                            os.makedirs(directory)
-                        except OSError as e:
-                            if e.errno == errno.EEXIST and os.path.isdir(directory):
-                                pass
-                            else:
-                                raise
-                        with open(os.path.join(directory, mapped_name), 'wb') as out:
-                            shutil.copyfileobj(artifact, out)
+                    try:
+                        with fileref.open('rb') as artifact:
+                            directory = os.path.join(self.artifacts_directory, six.text_type(id[0]))
+                            try:
+                                os.makedirs(directory)
+                            except OSError as e:
+                                if e.errno == errno.EEXIST and os.path.isdir(directory):
+                                    pass
+                                else:
+                                    raise
+                            with open(os.path.join(directory, mapped_name), 'wb') as out:
+                                shutil.copyfileobj(artifact, out)
+                    except IOError as e:
+                        if e.errno == errno.ENOENT:
+                            pass
+                        else:
+                            raise(e)
 
         if self.out:
             self.out.flush()
