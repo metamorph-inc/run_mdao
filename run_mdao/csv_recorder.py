@@ -135,9 +135,12 @@ class MappingCsvRecorder(BaseRecorder):
                                 shutil.copyfileobj(artifact, out)
                     except IOError as e:
                         if e.errno == errno.ENOENT:
-                            pass
+                            if not analysisErrorOccurred:
+                                print("WARNING: Driver Objective {} is connected to ".format(mapped_name)
+                                      + "{}, but MappingCsvRecorder did not find a file.".format(name)
+                                      + "\n         {}".format(str(e).replace("[Errno 2] ", "")))
                         else:
-                            raise(e)
+                            raise
 
         if self.out:
             self.out.flush()
