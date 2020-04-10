@@ -1,0 +1,24 @@
+cache:
+  - '%LOCALAPPDATA%\pip\cache -> requirements.txt'
+install:
+  - 'C:\Python27\python -m virtualenv venv'
+  - '.\venv\Scripts\pip install --upgrade "setuptools<45.0.0" -r requirements.txt nose'
+build_script:
+  - '.\venv\Scripts\python setup.py bdist_wheel'
+  - 'move /y dist\*.whl .'
+test_script:
+  - '.\venv\Scripts\nosetests'
+artifacts:
+  - path: '*.whl'
+    name: whl
+deploy:
+  provider: S3
+  access_key_id: AKIAJCSEQOUWIU2HK3SQ
+  secret_access_key:
+    secure: gKHiok/Emkvb298mPcxWXTn2ttSFnRTEmsaTYex3qZlqHSRVptKjvD2bVeA4XJ7a
+  bucket: pypi.metamorphsoftware.com
+  region: us-east-1
+  artifact: whl
+  folder: run-mdao
+  on:
+    appveyor_repo_tag: true
