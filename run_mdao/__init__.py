@@ -517,7 +517,13 @@ def with_problem(mdao_config, original_dir, override_driver=None, additional_rec
                     open_kwargs = {}
                 else:
                     open_kwargs = {'newline': ''}
-                recorder = MappingCsvRecorder({}, unknowns_map, io.open(recorder['filename'], mode, **open_kwargs), include_id=recorder.get('include_id', False))
+                if "class" in recorder:
+                    mod_name = '.'.join(recorder['class'].split('.')[:-1])
+                    class_name = recorder['class'].split('.')[-1]
+                    recorder_class = getattr(importlib.import_module(mod_name), class_name)
+                else:
+                    recorder_class = MappingCsvRecorder
+                recorder = recorder_class({}, unknowns_map, io.open(recorder['filename'], mode, **open_kwargs), include_id=recorder.get('include_id', False))
                 if (append_csv and exists) or mode == 'ab':
                     recorder._wrote_header = True
             elif recorder['type'] == 'AllCsvRecorder':
@@ -540,6 +546,7 @@ def with_problem(mdao_config, original_dir, override_driver=None, additional_rec
                 recorder = getattr(importlib.import_module(mod_name), class_name)()
 
             top.driver.add_recorder(recorder)
+            recorders.append(recorder)
         return recorders
 
     if is_subproblem:
@@ -581,7 +588,9 @@ def with_problem(mdao_config, original_dir, override_driver=None, additional_rec
             # top.root.dump(verbose=True)
             yield top
         finally:
+            print(recorders)
             for recorder in recorders:
+                print("Closing", recorder)
                 recorder.close()
 
 
