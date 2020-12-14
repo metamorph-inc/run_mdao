@@ -18,6 +18,8 @@ from openmdao.util.record_util import create_local_meta, update_local_meta
 from openmdao.core.mpi_wrap import MPI, debug
 import openmdao.api
 
+from openmdao.api import FileRef
+
 # from random import shuffle, randint
 import numpy as np
 from six import itervalues, iteritems
@@ -171,6 +173,8 @@ class FullFactorialDriver(PredeterminedRunsDriver):
                     value_arrays[name] = numpy.linspace(low, high, num=self.num_levels).tolist()
             elif value.get('type') == 'enum':
                 value_arrays[name] = list(value['items'])
+            elif value.get('type') == 'fileref':
+                value_arrays[name] = list([FileRef(item) for item in value['items']])
             elif value.get('type') == 'int':
                 # TODO limit len to num_levels?
                 value_arrays[name] = list(range(int(value['lower']), int(value['upper']) + 1))
@@ -195,6 +199,8 @@ class UniformDriver(PredeterminedRunsDriver):
                 return self.random.uniform(metadata['lower'], metadata['upper'])
             elif metadata.get('type') == 'enum':
                 return self.random.choice(metadata['items'])
+            elif metadata.get('type') == 'fileref':
+                return self.random.choice([FileRef(item) for item in metadata['items']])
             elif metadata.get('type') == 'int':
                 return self.random.randint(metadata['lower'], metadata['upper'] + 1)
 
@@ -221,6 +227,10 @@ class LatinHypercubeDriver(PredeterminedRunsDriver):
                 # length is generated such that all items have an equal chance of appearing when num_samples % len(items) != 0
                 length = self.num_samples + (-self.num_samples % len(metadata['items']))
                 buckets[design_var_name] = list(itertools.islice(itertools.cycle(metadata['items']), length))
+            elif metadata.get('type') == 'fileref':
+                # length is generated such that all items have an equal chance of appearing when num_samples % len(items) != 0
+                length = self.num_samples + (-self.num_samples % len(metadata['items']))
+                buckets[design_var_name] = list(itertools.islice(itertools.cycle([FileRef(item) for item in metadata['items']]), length))
             elif metadata.get('type') == 'int':
                 # FIXME: should do buckets instead
                 num_items = int(metadata['upper'] - metadata['lower'] + 1)
@@ -264,6 +274,12 @@ class OptimizedLatinHypercubeDriver(PredeterminedRunsDriver):
                 # length is generated such that all items have an equal chance of appearing when num_samples % len(items) != 0
                 length = self.num_samples + (-self.num_samples % len(metadata['items']))
                 values = list(itertools.islice(itertools.cycle(metadata['items']), length))
+                self.random.shuffle(values)
+                enums[design_var_name] = values
+            elif metadata.get('type', 'double') == 'fileref':
+                # length is generated such that all items have an equal chance of appearing when num_samples % len(items) != 0
+                length = self.num_samples + (-self.num_samples % len(metadata['items']))
+                values = list(itertools.islice(itertools.cycle([FileRef(item) for item in metadata['items']]), length))
                 self.random.shuffle(values)
                 enums[design_var_name] = values
             elif metadata.get('type', 'double') == 'int':

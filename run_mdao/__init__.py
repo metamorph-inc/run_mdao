@@ -227,6 +227,8 @@ def with_problem(mdao_config, original_dir, override_driver=None, additional_rec
                 driver_vars.append((var_name, default, {}))
             elif var['type'] == 'enum':
                 driver_vars.append((var_name, var['items'][0], {"pass_by_obj": True}))
+            elif var['type'] == 'fileref':
+                driver_vars.append((var_name, FileRef(var['items'][0]), {"pass_by_obj": True, "binary": var.get('binary', False)}))
             elif var['type'] == 'int':
                 driver_vars.append((var_name, 0, {}))
             else:
@@ -245,6 +247,13 @@ def with_problem(mdao_config, original_dir, override_driver=None, additional_rec
                 top.driver.add_desvar(formatted_name)
                 top.driver._desvars[formatted_name]['type'] = var['type']
                 top.driver._desvars[formatted_name]['items'] = var['items']
+            elif var['type'] == 'fileref':
+                driver_vars.append((var_name, FileRef(var['items'][0]), {"pass_by_obj": True, "binary": var.get('binary', False)}))
+                formatted_name = get_desvar_path(var_name)
+                top.driver.add_desvar(formatted_name)
+                top.driver._desvars[formatted_name]['type'] = var['type']
+                top.driver._desvars[formatted_name]['items'] = var['items']
+                top.driver._desvars[formatted_name]['binary'] = var.get('binary', False)
             elif var['type'] == 'int':
                 driver_vars.append((var_name, 0.0))
                 formatted_name = get_desvar_path(var_name)

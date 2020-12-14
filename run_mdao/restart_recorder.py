@@ -7,6 +7,7 @@ import shutil
 import io
 
 from openmdao.util.array_util import evenly_distrib_idxs
+from openmdao.api import FileRef
 
 from openmdao.core.mpi_wrap import MPI
 import six
@@ -58,9 +59,16 @@ class RestartRecorder(object):
             header = list(p[0] for p in runlist[0])
             writer.writerow(header)
             for run in runlist:
-                writer.writerow([p[1] for p in run])
+                writer.writerow([cls.serialize_filerefs(p[1]) for p in run])
         with open(os.path.join(original_dir, RestartRecorder.RESTART_PROGRESS_FILENAME), 'w') as restart_progress_file:
             restart_progress_file.write(json.dumps({i: 0 for i in range(comm_size)}))
+
+    @staticmethod
+    def serialize_filerefs(value):
+        if isinstance(value, FileRef):
+            return "(FileRef)" + value.fname
+        else:
+            return value
 
     def __init__(self, original_dir, comm):
         super(RestartRecorder, self).__init__()
