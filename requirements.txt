@@ -1,6 +1,6 @@
 --index-url https://pypi.metamorphsoftware.com/
 
-testbenchexecutor==0.1.9
+testbenchexecutor==0.1.10
 
 numpy==1.13.1; sys_platform == 'win32'
 scipy==0.19.1; sys_platform == 'win32'
