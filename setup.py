@@ -20,5 +20,8 @@ setup(
         "console_scripts": [
             "run_mdao = run_mdao.__main__:main",
         ]
-    }
+    },
+    project_urls={
+        'Source': 'https://github.com/metamorph-inc/run_mdao',
+    },
 )
