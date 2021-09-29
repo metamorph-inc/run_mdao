@@ -16,6 +16,7 @@ run_mdao/test/TestBench2_Files/FileInput1.ext
 run_mdao/test/TestBench2_Files/FileOutput1.ext
 run_mdao/test/TestBench2_Files/log/
 run_mdao/test/time.txt
+_REPORT.html
 # these tests aren't repeatable
 run_mdao/test/mdao_config_driverless_hierarchy.json.output.csv
 run_mdao/test/mdao_config_simple_subproblem.json.output.csv
