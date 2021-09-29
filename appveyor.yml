@@ -6,6 +6,7 @@ install:
 build_script:
   - '.\venv\Scripts\python setup.py bdist_wheel'
   - 'move /y dist\*.whl .'
+  - sha1sum *.whl
 test_script:
   - '.\venv\Scripts\nosetests'
 artifacts:
