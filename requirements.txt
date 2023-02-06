@@ -11,4 +11,4 @@ pywin32
 numpy==1.13.1; sys_platform != 'win32'
 scipy==0.19.1; sys_platform != 'win32'
 
-openmdao==1.7.4
+mms-openmdao==1.7.5rc1
