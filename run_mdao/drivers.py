@@ -469,7 +469,7 @@ class CsvDriver(PredeterminedRunsDriver):
 
     def _deserialize_or_create_runlist(self):
         runlist = []
-        with open(self.filename, 'rU') as csv_input:
+        with _universal_newline_open(self.filename) as csv_input:
             import csv
             reader = csv.reader(csv_input)
             header = next(iter(reader))
@@ -481,3 +481,11 @@ class CsvDriver(PredeterminedRunsDriver):
             for values in reader:
                 runlist.append(zip(map(run_mdao.get_desvar_path, filter_desvar(header)), filter_desvar(values)))
             return runlist
+
+
+def _universal_newline_open(filename):
+    import sys
+    if sys.version_info[0] == 2:
+        return open(filename, 'rU')
+    else:
+        return open(filename, 'r', newline=None)

@@ -11,7 +11,8 @@ import contextlib
 import itertools
 import numpy
 import six
-from collections import defaultdict, Mapping
+from collections import defaultdict
+from six.moves.collections_abc import Mapping
 
 from run_mdao.csv_recorder import MappingCsvRecorder, CsvRecorder
 from run_mdao.enum_mapper import EnumMapper
