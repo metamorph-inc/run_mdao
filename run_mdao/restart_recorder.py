@@ -97,6 +97,8 @@ class RestartRecorder(object):
             tmp_output = self.output_filename + '.tmp'
             with open(tmp_output, 'w') as output:
                 json.dump(self.progress_by_rank, output)
+            # n.b. shutil.move will copy the file on windows if the destination exists, which is slow
+            os.unlink(self.output_filename)
             shutil.move(tmp_output, self.output_filename)
         finally:
             self.output_lock.release()
