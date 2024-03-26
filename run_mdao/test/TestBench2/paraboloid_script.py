@@ -19,16 +19,10 @@ def log_formatted(s):
 
 try:
     import CyPhyPython  # will fail if not running under CyPhyPython
-    if six.PY2:
-        import cgi
+    import html
 
-        def log(s):
-            CyPhyPython.log(cgi.escape(s))
-    else:
-        import html
-
-        def log(s):
-            CyPhyPython.log(html.escape(s))
+    def log(s):
+        CyPhyPython.log(html.escape(s))
 
     def log_formatted(s):
         CyPhyPython.log(s)
