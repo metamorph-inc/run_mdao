@@ -9,6 +9,9 @@ import six
 import numpy
 
 if __name__ == '__main__':
+    sys.stdout.reconfigure(encoding='utf-8')
+    sys.stderr.reconfigure(encoding='utf-8')
+
     parser = argparse.ArgumentParser(description='Run a mdao_config.json using OpenMDAO')
     parser.add_argument('filename', nargs='?', default='mdao_config.json')
     parser.add_argument('--one-component', help='component name')
