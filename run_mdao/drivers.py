@@ -194,7 +194,8 @@ class UniformDriver(PredeterminedRunsDriver):
                     return metadata['lower']
                 return self.random.uniform(metadata['lower'], metadata['upper'])
             elif metadata.get('type') == 'enum':
-                return self.random.choice(metadata['items'])
+                items = metadata['items']
+                return items[self.random.randint(0, len(items))]
             elif metadata.get('type') == 'int':
                 return self.random.randint(metadata['lower'], metadata['upper'] + 1)
 
