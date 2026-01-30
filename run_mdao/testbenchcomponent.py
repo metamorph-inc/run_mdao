@@ -153,7 +153,8 @@ class TestBenchComponent(Component):
             testbench_manifest_json.write(output)
 
     def _run_testbench(self):
-        return subprocess.call([sys.executable, '-m', 'testbenchexecutor', '--detailed-errors', 'testbench_manifest.json'], cwd=self.__directory)
+        return subprocess.call([sys.executable, '-m', 'testbenchexecutor', '--detailed-errors', 'testbench_manifest.json'], cwd=self.__directory,
+            encoding='utf-8', errors=True)
 
     def solve_nonlinear(self, params, unknowns, resids):
         # FIXME: without dict(), this returns wrong values. why?
