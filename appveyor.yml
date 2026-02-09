@@ -1,8 +1,10 @@
+image: Visual Studio 2022
+
 cache:
   - '%LOCALAPPDATA%\pip\cache -> requirements.txt'
 install:
-  - 'C:\Python27\python -m virtualenv venv'
-  - '.\venv\Scripts\pip install --upgrade "setuptools<45.0.0" -r requirements.txt nose'
+  - 'C:\Python311-x64\python.exe -m virtualenv venv'
+  - '.\venv\Scripts\pip install --upgrade -r requirements.txt nose'
 build_script:
   - '.\venv\Scripts\python setup.py bdist_wheel'
   - 'move /y dist\*.whl .'
