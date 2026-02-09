@@ -1,14 +1,9 @@
 --index-url https://pypi.metamorphsoftware.com/
 
 testbenchexecutor==0.1.10
-
-numpy==1.13.1; sys_platform == 'win32'
-scipy==0.19.1; sys_platform == 'win32'
-pywin32
+pywin32; sys_platform == 'win32'
 
 --extra-index-url https://pypi.python.org/simple
 
-numpy==1.13.1; sys_platform != 'win32'
-scipy==0.19.1; sys_platform != 'win32'
-
+numpy
 mms-openmdao==1.7.5rc1
