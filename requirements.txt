@@ -6,4 +6,4 @@ pywin32; sys_platform == 'win32'
 --extra-index-url https://pypi.python.org/simple
 
 numpy<2
-mms-openmdao==1.7.5rc1
+mms-openmdao==1.7.5
