@@ -9,7 +9,7 @@ from setuptools import setup
 
 setup(
     name='run_mdao',
-    version='0.5.0',
+    version='0.5.1',
     author='MetaMorph Software, Inc',
     author_email='ksmyth@metamorphsoftware.com',
     description='Runs a mdao_config.json with OpenMDAO',
